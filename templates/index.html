@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>ASIN → Keepa Product Verifier</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <style>
+    :root { --bg:#0b0d10; --card:#12151a; --ink:#e7eaf0; --muted:#9aa3b2; --accent:#6aa7ff; --error:#ff6b6b; --ok:#70e09a; }
+    * { box-sizing:border-box; }
+    body { margin:0; background:var(--bg); color:var(--ink); font: 16px/1.45 system-ui, -apple-system, Segoe UI, Roboto, Inter, Arial, sans-serif; }
+    header { padding:24px; border-bottom:1px solid #1e232c; }
+    header h1 { margin:0; font-size:20px; font-weight:600; }
+    main { max-width:1100px; margin:24px auto; padding:0 16px 60px; }
+
+    form { background:var(--card); border:1px solid #1c212b; border-radius:12px; padding:16px; display:grid; gap:12px; }
+    .row { display:grid; gap:12px; grid-template-columns: 1fr 1fr; }
+    .field { display:flex; flex-direction:column; gap:6px; }
+    .field label { font-size:12px; color:var(--muted); }
+    input[type=text], textarea { background:#0e1116; border:1px solid #2a3140; color:var(--ink); border-radius:10px; padding:10px 12px; outline:none; }
+    textarea { min-height:110px; resize:vertical; }
+    .hint { font-size:12px; color:var(--muted); }
+    .actions { display:flex; gap:12px; justify-content:flex-end; }
+    button { background:var(--accent); color:#00132b; border:0; padding:10px 14px; border-radius:10px; font-weight:600; cursor:pointer; }
+
+    .summary { margin:14px 0; color:var(--muted); }
+    .summary strong { color:var(--ink); }
+
+    /* results */
+    .grid { margin-top:16px; display:grid; gap:14px; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); }
+    .card { border:1px solid #1c212b; background:var(--card); border-radius:14px; overflow:hidden; display:grid; grid-template-columns: 120px 1fr; min-height:150px; }
+    .imgwrap { background:#0e1116; display:flex; align-items:center; justify-content:center; }
+    .imgwrap img { max-width:100%; max-height:100%; object-fit:contain; }
+    .meta { padding:12px; display:flex; flex-direction:column; gap:6px; }
+    .title { font-weight:600; }
+    .kv { display:grid; grid-template-columns: 130px 1fr; gap:6px 10px; align-items:start; font-size:13px; }
+    .key { color:var(--muted); }
+    .ok { color:var(--ok); font-weight:600; }
+    .warn { color:var(--muted); }
+    .err { color:var(--error); }
+    .reasons { font-size:12px; color:#cbd4e1; margin-top:4px; }
+    .idlist { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace; font-size:12px; color:#cfd6e3; }
+    .empty { border:1px dashed #2a3140; padding:18px; border-radius:12px; color:var(--muted); }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>ASIN → Keepa Product Verifier (Phase-1 Filter)</h1>
+  </header>
+  <main>
+    <form method="post" action="/analyze" autocomplete="off">
+      <div class="row">
+        <div class="field">
+          <label for="keepa_key">Keepa API key <span class="hint">(stored in your browser until you close/refresh)</span></label>
+          <input type="text" id="keepa_key" name="keepa_key" placeholder="KEEPA-API-KEY" required />
+        </div>
+        <div class="field">
+          <label for="ebay_title">eBay Title (fallback search) — required</label>
+          <input type="text" id="ebay_title" name="ebay_title" placeholder="Paste an eBay listing title…" required />
+          <div class="hint">If Amazon links are empty, we’ll query Product Finder with this title and pull the 25 cheapest (current NEW).</div>
+        </div>
+      </div>
+
+      <div class="field">
+        <label for="amazon_links">Amazon URLs or ASINs (optional, one per line)</label>
+        <textarea id="amazon_links" name="amazon_links" placeholder="https://www.amazon.com/dp/B0... or ASIN only (one per line)"></textarea>
+      </div>
+
+      <div class="actions">
+        <button type="submit">Fetch & Filter</button>
+      </div>
+    </form>
+
+    {% if summary %}
+      <div class="summary">
+        <strong>{{ summary.passed }}</strong> matched out of <strong>{{ summary.checked }}</strong> checked.
+        Showing only those that passed Phase-1.
+      </div>
+    {% endif %}
+
+    {% if batch and batch|length > 0 %}
+      <div class="grid">
+        {% for item in batch %}
+          {% set r = item.result %}
+          <div class="card">
+            <div class="imgwrap">
+              {% if r and r.imageURL %}
+                <img src="{{ r.imageURL }}" alt="image for {{ r.title or r.asin }}" loading="lazy">
+              {% else %}
+                <span class="hint" style="padding:8px;">No image</span>
+              {% endif %}
+            </div>
+            <div class="meta">
+              <div class="title">{{ r.title or '—' }}</div>
+              <div class="kv">
+                <div class="key">ASIN</div><div>{{ r.asin }}</div>
+                <div class="key">Brand</div><div>{{ r.brand or '—' }}</div>
+                <div class="key">MPN</div><div>{{ r.mpn or '—' }}</div>
+                <div class="key">Group</div><div>{{ r.productGroup or '—' }}</div>
+                <div class="key">Category</div><div>{{ r.categoryLeaf or '—' }}</div>
+                <div class="key">Color</div><div>{{ r.color or '—' }}</div>
+                <div class="key">Size</div><div>{{ r.size or '—' }}</div>
+                <div class="key">Pack Qty</div><div>{{ r.packageQuantity or r.numberOfItems or '—' }}</div>
+                <div class="key">Price</div><div>{% if r.currentPriceUSD is not none %}${{ '%.2f'|format(r.currentPriceUSD) }}{% else %}—{% endif %}</div>
+
+                <div class="key">Score</div>
+                <div class="{{ 'ok' if item.match.score >= 0.7 else 'warn' }}">{{ '%.2f'|format(item.match.score) }}</div>
+              </div>
+
+              {% if r.upcList or r.eanList %}
+                <div class="idlist" style="margin-top:4px;">
+                  {% if r.upcList %}<div>UPC: {{ r.upcList|join(', ') }}</div>{% endif %}
+                  {% if r.eanList %}<div>EAN: {{ r.eanList|join(', ') }}</div>{% endif %}
+                </div>
+              {% endif %}
+
+              {% if item.match.reasons %}
+                <div class="reasons">
+                  {% for reason in item.match.reasons %}
+                    • {{ reason }}<br/>
+                  {% endfor %}
+                </div>
+              {% endif %}
+
+              <div class="hint" style="margin-top:6px;">Input: {{ item.input }}</div>
+            </div>
+          </div>
+        {% endfor %}
+      </div>
+    {% else %}
+      <div class="empty" style="margin-top:16px;">Results will appear here.</div>
+    {% endif %}
+  </main>
+
+  <script>
+    // Persist Keepa key within the browser (until tab refresh/close)
+    const keyInput = document.getElementById('keepa_key');
+    keyInput.value = localStorage.getItem('keepaKey') || '';
+    keyInput.addEventListener('input', () => {
+      localStorage.setItem('keepaKey', keyInput.value.trim());
+    });
+  </script>
+</body>
+</html>

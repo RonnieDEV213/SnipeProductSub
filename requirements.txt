@@ -1,2 +1,5 @@
-streamlit
-openai
+fastapi==0.115.2
+uvicorn==0.30.6
+httpx==0.27.2
+python-dotenv==1.0.1
+jinja2==3.1.4python-multipart==0.0.20
