@@ -1,0 +1,79 @@
+/* Modern UI enhancement layer (non-destructive overrides) */
+:root{
+  --grad-accent:linear-gradient(90deg,#74b0ff,#9b7bff 55%,#ff8ad4);
+  --chip-bg:#141b24;
+  --chip-border:#273142;
+  --chip-ok:#2f855a; /* green (text) */
+  --chip-err:#c53030; /* red */
+  --chip-warn:#b7791f;
+  --focus-ring:0 0 0 3px rgba(121,168,255,.35);
+  --anim-fast:120ms;
+  --anim:200ms;
+  --anim-slow:420ms;
+}
+body.modern{font-feature-settings:"cv11","ss01";}
+body.modern ::selection{background:#2d3c52;color:#e7ebf3}
+
+/* Light theme tokens (toggle adds .modern-light) */
+body.modern.modern-light{
+  --bg:#f5f7fb; --card:#ffffff; --ink:#0f141b; --muted:#5c6776; --border:#dfe4ec; --accent:#2563eb; --accent-ink:#f5faff;
+  --chip-bg:#f0f4f9; --chip-border:#d1dae5;
+}
+body.modern.modern-light header{backdrop-filter:blur(12px) saturate(170%);}
+body.modern.modern-light .prod{background:var(--card);}
+body.modern.modern-light .results-panel .results-head{background:linear-gradient(90deg,#ffffff,#f2f7ff);}
+
+/* Smooth fade + subtle elevate for cards */
+body.modern .prod, body.modern .panel, body.modern .card{transition:background var(--anim), border-color var(--anim), box-shadow var(--anim);} 
+body.modern .prod:hover{box-shadow:0 6px 22px -4px rgba(0,0,0,.55); transform:translateY(-2px);}
+body.modern .prod{transition:box-shadow var(--anim), transform var(--anim);}
+
+/* Metric chips */
+.metric-chips{display:flex; flex-wrap:wrap; gap:8px; margin-top:6px;}
+.metric-chip{font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:.6px; background:var(--chip-bg); color:var(--muted); border:1px solid var(--chip-border); padding:6px 10px; border-radius:999px; display:inline-flex; align-items:center; gap:6px; line-height:1.1; backdrop-filter:blur(6px);}
+.metric-chip strong{color:var(--ink); font-weight:700; font-variant-numeric:tabular-nums;}
+.metric-chip.ok{color:#6fe3a1; border-color:rgba(111,227,161,.45); background:rgba(111,227,161,.08);}
+.metric-chip.err{color:#ff6b6b; border-color:rgba(255,107,107,.45); background:rgba(255,107,107,.07);}
+.metric-chip.warn{color:#ffcb66; border-color:rgba(255,196,86,.45); background:rgba(255,196,86,.08);}
+
+.results-panel .results-head{display:flex; flex-wrap:wrap; align-items:center; gap:14px;}
+.results-panel .results-head .results-summary{flex:1 1 auto;}
+
+/* Gradient accent for header title */
+body.modern h1{background:var(--grad-accent); -webkit-background-clip:text; color:transparent;}
+
+/* Pills slight glass effect */
+body.modern .pill{background:rgba(255,255,255,0.04); border-color:#2a3545; backdrop-filter:blur(4px);}
+body.modern.modern-light .pill{background:#f0f4f9; border-color:#d4dce5; color:#2f3b48;}
+
+/* Toggle button (mode switch) */
+.theme-toggle{margin-left:auto; display:inline-flex; align-items:center; gap:6px; cursor:pointer; font-size:12px; color:var(--muted); background:rgba(255,255,255,0.05); border:1px solid var(--border); padding:8px 12px; border-radius:999px; font-weight:600; letter-spacing:.4px; transition:background var(--anim), color var(--anim), border-color var(--anim);} 
+.theme-toggle:hover{background:rgba(255,255,255,0.09);} 
+body.modern.modern-light .theme-toggle{background:#f0f4f9;}
+
+/* Progress bar modern polish */
+body.modern #runProgress .track{background:linear-gradient(90deg,#1c2531,#2b3645);} 
+body.modern.modern-light #runProgress .track{background:linear-gradient(90deg,#d2dae4,#e3ebf5);} 
+body.modern #runProgress .bar{background:linear-gradient(90deg,#5ea8ff,#9b7bff);} 
+body.modern.modern-light #runProgress .bar{background:linear-gradient(90deg,#2563eb,#7c3aed);} 
+
+/* Reduced motion preference */
+@media (prefers-reduced-motion:reduce){
+  body.modern .prod{transition:none;}
+  .metric-chip, .pill{transition:none;}
+}
+
+/* Scrollbar refinement (webkit) */
+body.modern ::-webkit-scrollbar{width:12px;}
+body.modern ::-webkit-scrollbar-track{background:#10161e;}
+body.modern ::-webkit-scrollbar-thumb{background:#273142; border:3px solid #10161e; border-radius:8px;}
+body.modern.modern-light ::-webkit-scrollbar-track{background:#e4e9ef;}
+body.modern.modern-light ::-webkit-scrollbar-thumb{background:#c1ccd8; border:3px solid #e4e9ef;}
+
+/* Compact product title clamp improvement */
+body.modern .title{line-height:1.35;}
+
+/* Empty state subtle animation */
+body.modern .empty{position:relative; overflow:hidden;}
+body.modern .empty::after{content:""; position:absolute; inset:0; background:radial-gradient(circle at 30% 40%, rgba(121,168,255,.08), transparent 70%); pointer-events:none;}
+

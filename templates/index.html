@@ -2,142 +2,1821 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <title>ASIN → Keepa Product Verifier</title>
+  <title>Automatic SnipeProductSub By Ronnie</title>
   <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <link rel="stylesheet" href="/static/modern.css" />
   <style>
-    :root { --bg:#0b0d10; --card:#12151a; --ink:#e7eaf0; --muted:#9aa3b2; --accent:#6aa7ff; --error:#ff6b6b; --ok:#70e09a; }
-    * { box-sizing:border-box; }
-    body { margin:0; background:var(--bg); color:var(--ink); font: 16px/1.45 system-ui, -apple-system, Segoe UI, Roboto, Inter, Arial, sans-serif; }
-    header { padding:24px; border-bottom:1px solid #1e232c; }
-    header h1 { margin:0; font-size:20px; font-weight:600; }
-    main { max-width:1100px; margin:24px auto; padding:0 16px 60px; }
+    :root{ --bg:#0b0d10; --card:#11151b; --ink:#e7ebf3; --muted:#9aa3b2; --accent:#79a8ff; --accent-ink:#001227; --ok:#6fe3a1; --error:#ff6b6b; --border:#1b212c; --elev:0 10px 25px rgba(0,0,0,.25); --radius:14px; }
+    /* Layout constants for sticky header + sidebar alignment */
+    :root{ --header-h:64px; --page-pad-x:16px; }
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{ margin:0; background:var(--bg); color:var(--ink); font:15px/1.5 system-ui,-apple-system,Segoe UI,Roboto,Inter,Arial,sans-serif; }
+  /* Modern sticky header (glass + subtle gradient + blur) */
+  header{ position:sticky; top:0; z-index:1000; backdrop-filter:blur(10px) saturate(140%); -webkit-backdrop-filter:blur(10px) saturate(140%); }
+  header::before{ content:""; position:absolute; inset:0; background:linear-gradient(135deg, rgba(255,255,255,0.06), rgba(255,255,255,0.02)); pointer-events:none; }
+  .head-inner{ position:relative; display:flex; align-items:center; gap:14px; min-height:var(--header-h); padding:0 var(--page-pad-x); }
+  h1{margin:0; font-size:18px; font-weight:650; letter-spacing:.25px; background:linear-gradient(90deg,var(--ink),#b8d4ff); -webkit-background-clip:text; color:transparent;}
+  .badge{margin-left:auto; font-size:12px; color:var(--muted); border:1px solid var(--border); padding:5px 10px; border-radius:999px; background:rgba(255,255,255,0.04); backdrop-filter:blur(4px);}
+  /* Subtle bottom divider line */
+  header{ border-bottom:1px solid rgba(255,255,255,0.07); box-shadow:0 4px 18px -6px rgba(0,0,0,.55); }
+  @media (max-width:640px){ h1{font-size:16px;} .head-inner{gap:10px;} }
 
-    form { background:var(--card); border:1px solid #1c212b; border-radius:12px; padding:16px; display:grid; gap:12px; }
-    .row { display:grid; gap:12px; grid-template-columns: 1fr 1fr; }
-    .field { display:flex; flex-direction:column; gap:6px; }
-    .field label { font-size:12px; color:var(--muted); }
-    input[type=text], textarea { background:#0e1116; border:1px solid #2a3140; color:var(--ink); border-radius:10px; padding:10px 12px; outline:none; }
-    textarea { min-height:110px; resize:vertical; }
-    .hint { font-size:12px; color:var(--muted); }
-    .actions { display:flex; gap:12px; justify-content:flex-end; }
-    button { background:var(--accent); color:#00132b; border:0; padding:10px 14px; border-radius:10px; font-weight:600; cursor:pointer; }
+/* ===== Page Layout ===== */
+main{margin:0 0 64px; padding:12px var(--page-pad-x) 0;}
+/* Core layout (flex) for stable two-column alignment */
+form.app{ display:flex; align-items:flex-start; gap:16px; }
+form.app > .sidebar{ flex:0 0 320px; }
+form.app > .content{ flex:1 1 auto; min-width:0; }
+@media (max-width:980px){ form.app{flex-direction:column;} form.app > .sidebar{flex:0 0 auto; position:static !important;} }
 
-    .summary { margin:14px 0; color:var(--muted); }
-    .summary strong { color:var(--ink); }
+/* ===== Cards / Panels ===== */
+.card,.panel,details.block{
+  background:var(--card); border:1px solid var(--border);
+  border-radius:var(--radius); box-shadow:var(--elev);
+}
+.card .card-h{padding:12px 14px; border-bottom:1px solid var(--border); color:var(--muted); font-size:13px; letter-spacing:.3px}
+.card .card-c{padding:14px; display:grid; gap:10px}
+.panel{padding:14px;}
 
-    /* results */
-    .grid { margin-top:16px; display:grid; gap:14px; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); }
-    .card { border:1px solid #1c212b; background:var(--card); border-radius:14px; overflow:hidden; display:grid; grid-template-columns: 120px 1fr; min-height:150px; }
-    .imgwrap { background:#0e1116; display:flex; align-items:center; justify-content:center; }
-    .imgwrap img { max-width:100%; max-height:100%; object-fit:contain; }
-    .meta { padding:12px; display:flex; flex-direction:column; gap:6px; }
-    .title { font-weight:600; }
-    .kv { display:grid; grid-template-columns: 130px 1fr; gap:6px 10px; align-items:start; font-size:13px; }
-    .key { color:var(--muted); }
-    .ok { color:var(--ok); font-weight:600; }
-    .warn { color:var(--muted); }
-    .err { color:var(--error); }
-    .reasons { font-size:12px; color:#cbd4e1; margin-top:4px; }
-    .idlist { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace; font-size:12px; color:#cfd6e3; }
-    .empty { border:1px dashed #2a3140; padding:18px; border-radius:12px; color:var(--muted); }
+/* ===== Sidebar ===== */
+/* Stable sticky sidebar aligned under header */
+.sidebar{ position:sticky; top:calc(var(--header-h) + 12px); display:flex; flex-direction:column; gap:14px; align-self:flex-start; }
+
+/* Collapsible block (sidebar sections) */
+details.block{overflow:hidden;}
+details.block>summary{
+  list-style:none; cursor:pointer; padding:12px 14px; display:flex; align-items:center; justify-content:space-between;
+  color:var(--ink); font-size:13px; font-weight:600; letter-spacing:.2px;
+  background:#0f141b; border-bottom:1px solid var(--border); user-select:none;
+}
+details.block>summary .h{color:var(--muted)}
+details.block>summary .caret{display:inline-block; transform:rotate(0deg); transition:transform .15s ease; font-size:14px; opacity:.9}
+details.block[open]>summary .caret{transform:rotate(90deg)}
+details.block .section-body{padding:14px; display:grid; gap:10px}
+
+/* eBay product quick card */
+.ebay-product-card{border:1px solid var(--border); background:var(--card); border-radius:var(--radius); overflow:hidden; box-shadow:var(--elev);}
+.ebay-product-card .ep-head{padding:10px 14px; background:#0f141b; border-bottom:1px solid var(--border); display:flex; align-items:center; justify-content:space-between;}
+.ebay-product-card .ep-title{margin:0; font-size:12px; letter-spacing:.5px; font-weight:600; text-transform:uppercase; color:var(--muted);}
+.ebay-product-card .ep-body{padding:12px 14px; background:#0e1218; display:grid; gap:6px;}
+.ebay-product-card a{color:var(--accent); text-decoration:none; font-weight:600; line-height:1.3;}
+.ebay-product-card a:hover{text-decoration:underline}
+.ebay-product-card .placeholder{font-size:12px; color:var(--muted);}
+
+/* ===== Form controls ===== */
+label{font-size:12px; color:var(--muted)}
+.field{display:grid; gap:6px}
+input[type=text],input[type=password],textarea,select{
+  width:100%; background:#0e1218; border:1px solid #273042; color:var(--ink);
+  border-radius:10px; padding:10px 12px; outline:none;
+  transition:border-color .18s ease, background .18s ease, box-shadow .25s ease;
+}
+/* Constrained + auto-resize textareas (eBay JSON & Amazon links) */
+textarea#ebay_data, textarea#amazon_links{
+  /* Allow full panel width (previously max-width:820px causing left-aligned narrow box) */
+  max-width:none;
+  width:100%; /* span full inner panel so borders align with panel padding */
+  resize:none;          /* disable manual drag */
+  min-height:90px;
+  max-height:380px;     /* cap growth */
+  overflow:auto;        /* scroll once max-height reached */
+  font-family:ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size:13px;
+  line-height:1.35;
+  white-space:pre-wrap;
+  word-break:break-word;
+  tab-size:2;
+}
+input:focus,textarea:focus,select:focus{border-color:#3a4a65}
+.input-with-reveal input:-webkit-autofill,
+.input-with-reveal input:-webkit-autofill:hover,
+.input-with-reveal input:-webkit-autofill:focus,
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus{ box-shadow:0 0 0px 1000px #0e1218 inset; /* force dark bg */ }
+/* Firefox (autofill) */
+input:-moz-autofill{
+  box-shadow:0 0 0 1000px #0e1218 inset;
+  -moz-text-fill-color:var(--ink);
+}
+.input-with-reveal{display:flex; gap:8px; align-items:center}
+.reveal-btn{background:#182131; color:#cbd7ea; border:1px solid #273042; padding:8px 10px; border-radius:10px; cursor:pointer}
+.krow{display:flex; align-items:center; justify-content:space-between; gap:10px}
+.slider-row{display:flex; align-items:center; gap:10px; width:100%;}
+.slider-row input[type=range]{flex:1 1 auto; min-width:0;}
+.slider-row input.inline-number{flex:0 0 72px; text-align:right;}
+.hint{font-size:12px; color:var(--muted)}
+.small{font-size:12px}
+
+/* --- Themed sliders for fee percentages --- */
+input.fee-slider{ -webkit-appearance:none; width:100%; height:6px; border-radius:4px; background:#273042; outline:none; cursor:pointer; position:relative; }
+input.fee-slider:focus{box-shadow:0 0 0 3px rgba(121,168,255,.25)}
+/* WebKit thumb */
+input.fee-slider::-webkit-slider-thumb{ -webkit-appearance:none; width:18px; height:18px; border-radius:50%; background:var(--accent); border:2px solid var(--accent-ink); box-shadow:0 2px 6px rgba(0,0,0,.6); transition:transform .15s ease, background .2s; }
+input.fee-slider:active::-webkit-slider-thumb{ transform:scale(1.1); }
+/* Firefox */
+input.fee-slider::-moz-range-thumb{ width:18px; height:18px; border-radius:50%; background:var(--accent); border:2px solid var(--accent-ink); box-shadow:0 2px 6px rgba(0,0,0,.6); transition:transform .15s ease, background .2s; }
+input.fee-slider:active::-moz-range-thumb{ transform:scale(1.1); }
+input.fee-slider::-moz-range-track{ height:6px; background:#273042; border-radius:4px; }
+
+/* Inline numeric display that looks like text until focused */
+input.inline-number{ background:transparent; border:1px solid transparent; color:var(--ink); padding:4px 6px; font:600 13px/1 system-ui,-apple-system,Segoe UI,Roboto,Inter,Arial,sans-serif; text-align:right; transition:border-color .15s ease, background .15s ease; cursor:pointer; }
+input.inline-number:focus{ cursor:text; background:#0e1218; border-color:#3a4a65; outline:none; }
+input.inline-number::-webkit-outer-spin-button,
+input.inline-number::-webkit-inner-spin-button{ -webkit-appearance:none; margin:0; }
+input.inline-number[type=number]{ -moz-appearance:textfield; }
+
+/* ===== Reusable Hover Highlight (inputs, selects, textarea, numbers) ===== */
+input[type=text]:hover,
+input[type=password]:hover,
+textarea:hover,
+select:hover{
+  border-color:#3a4f69; /* slightly brighter */
+  background:#131a24;
+}
+/* Inline number (when not focused) */
+input.inline-number:not(:focus):hover{
+  border-color:#3a4f69;
+  background:#182131;
+}
+/* Range slider thumb subtle hover glow */
+input.fee-slider:hover::-webkit-slider-thumb{ box-shadow:0 0 0 4px rgba(121,168,255,.18), 0 2px 6px rgba(0,0,0,.6); }
+input.fee-slider:hover::-moz-range-thumb{ box-shadow:0 0 0 4px rgba(121,168,255,.18), 0 2px 6px rgba(0,0,0,.6); }
+/* Do not affect labels-only hover—only direct element hover is targeted above */
+
+/* ===== Fees grid in sidebar ===== */
+.fees{display:grid; gap:8px; font-size:13px; grid-template-columns:1fr auto}
+.fees .k{color:var(--muted)}
+.fees .v{text-align:right}
+
+/* ===== How it works steps ===== */
+.steps{display:grid; gap:10px}
+.step{display:flex; gap:10px; align-items:flex-start}
+.step .num{
+  flex:0 0 22px; height:22px; border-radius:999px; background:#182131; border:1px solid #273042;
+  display:grid; place-items:center; font-size:12px; color:#cbd7ea; margin-top:2px;
+}
+.step .txt{font-size:13px; color:#dae2f0}
+
+/* ===== Content Column (universal vertical rhythm) ===== */
+/* Define a single reusable stack gap variable; adjust once to affect all sections */
+/* === Unified vertical stack system (flex gap, script-safe) === */
+:root{ --stack-gap:16px; }
+/* The five primary blocks live in .stack; we use flex column with row-gap so only element children participate. */
+.stack{display:flex; flex-direction:column; row-gap:var(--stack-gap); margin:0; padding:0;}
+.stack > .stack-item{margin:0;} /* neutralize any legacy margins */
+/* Remove double-border illusion: when a details panel is closed, drop its bottom border */
+.stack > .stack-item.details-collapsible:not([open]){border-bottom-color:transparent;}
+/* Provide a subtle separator if desired (currently none). Customization hook left here. */
+
+/* ===== Progress Widget (namespaced to avoid collisions) ===== */
+.progress-card{
+  background:var(--card); border:1px solid var(--border);
+  border-radius:12px; padding:14px 14px 10px; /* margin removed (handled by universal stack gap) */ box-shadow:0 1px 0 rgba(0,0,0,.25);
+}
+.progress-log-wrapper{max-width:100%; width:100%;}
+.progress-header{display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:10px}
+.progress-title{font-weight:600; font-size:14px; color:var(--ink)}
+.progress-percent{font-variant-numeric:tabular-nums; color:var(--muted); font-size:12px}
+/* Container can grow to fit the label */
+#runProgress.progress{
+  position:relative;
+  margin-top:8px;
+  height:auto;            /* <-- allow label to be visible */
+  overflow:visible;       /* <-- don't clip the label */
+}
+
+/* The visual track for the bar */
+#runProgress .track{
+  height:8px;
+  background:var(--border);
+  border-radius:9999px;
+  overflow:hidden;        /* only clip inside the bar track */
+}
+
+/* The blue bar */
+#runProgress .bar{
+  height:100%;
+  width:0;
+  background:var(--accent);
+  transition:width .25s ease;
+}
+
+/* The live one-line status under the bar */
+#runProgress .label{
+  display:block;
+  margin-top:8px;
+  min-height:1.2em;
+  color:var(--muted);
+  font:500 13px/1.6 system-ui,-apple-system,Segoe UI,Roboto,Inter,Arial,sans-serif;
+}
+
+.progress-summary{list-style:none; padding-left:0; margin:8px 0 0; color:var(--muted); font-size:12px}
+.toggle{display:flex; align-items:center; gap:6px; cursor:pointer; color:var(--muted); font-size:12px}
+.toggle .chev{transition:transform .2s ease}
+.log{margin-top:10px; border-top:1px dashed var(--border); padding-top:8px; display:none}
+.log-row{display:grid; grid-template-columns:120px 1fr; gap:10px; padding:6px 0; border-bottom:1px dotted rgba(255,255,255,.06)}
+.log-row:last-child{border-bottom:none}
+.log-time{font-family:ui-monospace,SFMono-Regular,Menlo,monospace; color:#9ca3af; font-size:12px}
+.log-label{font-weight:600; color:#e5e7eb; font-size:12px; margin-bottom:2px}
+.log-detail{white-space:pre-wrap; color:#cbd5e1; font-size:12px; opacity:.9}
+
+input.is-invalid, textarea.is-invalid {
+  outline:2px solid var(--error, #ff6b6b);
+  border-color:var(--error, #ff6b6b) !important;
+}
+
+/* ===== Results Grid (row-major CSS grid) ===== */
+.grid{display:grid; grid-template-columns:repeat(3, 1fr); gap:14px; align-items:start}
+@media (max-width:1200px){ .grid{grid-template-columns:repeat(2, 1fr)} }
+@media (max-width:780px){ .grid{grid-template-columns:1fr} }
+
+/* Unified results panel w/ integrated header summary */
+.results-panel{padding:0; overflow:hidden;}
+.results-panel .results-head{padding:10px 14px; background:#0f141b; border-bottom:1px solid var(--border); font-size:13px; font-weight:600; letter-spacing:.35px; display:flex; align-items:center; gap:10px;}
+.results-panel .results-summary{color:var(--muted); font-weight:500; line-height:1.3;}
+.results-panel .results-summary strong{color:var(--ink); font-weight:700;}
+.results-panel .results-summary .sep{opacity:.4; margin:0 4px;}
+.results-panel .results-body > .grid{padding:5px; margin-top:10px;} /* local inner gap below sort controls */
+/* Metric chips (summary badges) */
+.metric-chips{display:flex; flex-wrap:wrap; gap:8px; margin-top:6px;}
+.metric-chip{display:inline-flex; align-items:center; gap:4px; font-size:11px; padding:4px 10px; border-radius:999px; background:#182131; color:var(--muted); border:1px solid #273042; font-weight:500; letter-spacing:.35px; line-height:1.2;}
+.metric-chip span{opacity:.8; font-weight:500;}
+.metric-chip strong{font-weight:700; color:var(--ink);}
+.metric-chip.green{background:rgba(111,227,161,.14); border-color:rgba(111,227,161,.45); color:#6fe3a1;}
+.metric-chip.green strong{color:#6fe3a1;}
+.metric-chip.yellow{background:rgba(255,196,86,.18); border-color:rgba(255,196,86,.5); color:#ffcb66;}
+.metric-chip.yellow strong{color:#ffcb66;}
+/* Collapsible behavior for results section */
+details.results-panel{position:relative;}
+details.results-panel>summary{list-style:none; cursor:pointer; padding:0; margin:0; outline:none;}
+details.results-panel>summary::-webkit-details-marker{display:none}
+details.results-panel>summary .results-head{user-select:none;}
+details.results-panel>summary .caret{margin-left:auto; display:inline-block; transform:rotate(0deg); transition:transform .18s ease; font-size:14px; opacity:.85}
+details.results-panel[open]>summary .caret{transform:rotate(90deg);}
+details.results-panel .results-body{padding:0;}
+@media (prefers-reduced-motion:reduce){ details.results-panel>summary .caret{transition:none;} }
+
+/* Grid items */
+.prod{
+  display:block; width:100%;
+  border:1px solid var(--border); background:var(--card); border-radius:var(--radius); overflow:hidden;
+}
+
+/* ===== Facet Comparison Grid (Phase-2) ===== */
+.facet-panel{background:var(--card); border:1px solid var(--border); border-radius:12px; padding:14px; box-shadow:var(--elev); display:grid; gap:12px}
+.facet-panel h3{margin:0; font-size:15px; font-weight:600; letter-spacing:.3px; display:flex; align-items:center; gap:8px}
+.facet-panel .facet-meta{font-size:12px; color:var(--muted); line-height:1.4}
+.facet-scroll{overflow:auto; border:1px solid var(--border); border-radius:10px; background:#0e1218;}
+.candidates-column{display:grid; gap:16px;}
+.cand-card{border:1px solid var(--border); border-radius:10px; background:#0e1218; padding:12px; display:grid; gap:12px;}
+.cand-head{display:flex; gap:14px; align-items:flex-start;}
+.cand-img{flex:0 0 70px; width:70px; height:70px; background:#111923; border:1px solid #1f2530; border-radius:8px; display:flex; align-items:center; justify-content:center; overflow:hidden;}
+.cand-img img{max-width:100%; max-height:100%; object-fit:contain;}
+.cand-meta{flex:1; display:grid; gap:4px;}
+.cand-title a{color:var(--accent); font-weight:600; text-decoration:none;}
+.cand-title a:hover{text-decoration:underline;}
+.cand-sub{font-size:11px; color:var(--muted);}
+.cand-score{font-size:12px; font-weight:600; margin-top:2px;}
+.facet-grid-wrap{display:grid; gap:10px; grid-template-columns:repeat(auto-fill,minmax(180px,1fr));}
+.facet-card{border:1px solid #1f2530; border-radius:8px; padding:8px 8px 10px; background:#0f141b; display:grid; gap:4px; font-size:11px; line-height:1.25; position:relative;}
+.facet-card .f-name{font-weight:600; font-size:11px; letter-spacing:.3px; text-transform:uppercase; opacity:.85;}
+.facet-card .f-amazon{font-size:11px; font-weight:500;}
+.facet-card .f-ebay{font-size:10px; color:#94a2b3;}
+.facet-card .f-note{font-size:10px; color:#d4dae3; border-top:1px dashed #273042; padding-top:4px; margin-top:2px;}
+.facet-card.facet-green{background:rgba(111,227,161,.12); border-color:rgba(111,227,161,.4);}
+.facet-card.facet-yellow{background:rgba(255,196,86,.12); border-color:rgba(255,196,86,.4);}
+.facet-card.facet-red{background:rgba(255,107,107,.12); border-color:rgba(255,107,107,.45);}
+.facet-card.facet-gray{background:rgba(110,120,135,.12); border-color:rgba(110,120,135,.35);}
+.facet-scroll table{width:100%; border-collapse:separate; border-spacing:0; font-size:12px; table-layout:fixed;}
+.facet-scroll th,.facet-scroll td{word-wrap:break-word; white-space:normal;}
+/* Constrain non-sticky facet columns so table doesn’t force horizontal scroll */
+.facet-scroll .facet-grid th:not(.sticky-left),
+.facet-scroll .facet-grid td:not(.sticky-left){max-width:140px;}
+@media (max-width:1100px){
+  .facet-scroll .facet-grid th:not(.sticky-left),
+  .facet-scroll .facet-grid td:not(.sticky-left){max-width:120px; font-size:11px;}
+  .facet-scroll table{font-size:11px;}
+}
+.facet-scroll th,.facet-scroll td{padding:6px 8px; text-align:left; vertical-align:top; border-bottom:1px solid #1e2530; border-right:1px solid #1e2530;}
+.facet-scroll th:last-child,.facet-scroll td:last-child{border-right:none}
+.facet-scroll tr:last-child td{border-bottom:none}
+.facet-scroll thead th{position:sticky; top:0; background:#121820; z-index:2; font-weight:600; color:#cfd6e3; white-space:nowrap;}
+.facet-scroll tbody tr:hover td{background:#141b23}
+.facet-as{font-family:ui-monospace,Menlo,Consolas,monospace; font-size:11px; color:#9aa3b2}
+.facet-weight-row td{background:#121820; font-size:11px; color:#9aa3b2; font-style:italic}
+.facet-score{font-weight:600; font-variant-numeric:tabular-nums}
+.facet-status-cell{border-radius:6px; padding:4px 6px; display:block; line-height:1.2; font-weight:600; text-align:center;}
+.facet-green{background:rgba(111,227,161,.12); color:#6fe3a1;}
+.facet-yellow{background:rgba(255,196,86,.15); color:#ffcb66;}
+.facet-red{background:rgba(255,107,107,.15); color:#ff6b6b;}
+.facet-gray{background:rgba(110,120,135,.15); color:#9aa3b2;}
+.facet-note{font-size:10px; color:#9aa3b2; margin-top:2px; line-height:1.2;}
+.facet-panel .legend{display:flex; flex-wrap:wrap; gap:8px; font-size:11px; margin-top:4px}
+.facet-panel .legend span{display:flex; align-items:center; gap:4px}
+.facet-dot{width:12px; height:12px; border-radius:4px; display:inline-block}
+.dot-green{background:#6fe3a1}
+.dot-yellow{background:#ffcb66}
+.dot-red{background:#ff6b6b}
+.dot-gray{background:#5e6877}
+.facet-small{font-size:11px; color:var(--muted);}
+.sticky-left{position:sticky; left:0; background:#11151b; box-shadow:2px 0 0 rgba(0,0,0,.3); z-index:3}
+
+/* Facet reflow horizontal row styling */
+.facet-reflow{width:100%; border-collapse:separate; border-spacing:0; font-size:12px;}
+.facet-reflow thead th{position:sticky; top:0; background:#121820; z-index:2; padding:8px 10px; font-weight:600; color:#cfd6e3; text-align:left;}
+.facet-reflow td{vertical-align:top; padding:10px 10px; border-bottom:1px solid #1e2530;}
+.facet-reflow tr:last-child td{border-bottom:none}
+.facet-top-row td{background:#0f141b;}
+.facet-top-row .title-cell a{color:var(--accent); text-decoration:none; font-weight:600;}
+.facet-top-row .title-cell a:hover{text-decoration:underline;}
+.facet-top-row .score-badge{display:inline-block; padding:6px 10px; border-radius:8px; font-weight:600; font-variant-numeric:tabular-nums; font-size:12px;}
+.score-badge.ok{background:rgba(111,227,161,.12); color:#6fe3a1;}
+.score-badge.err{background:rgba(255,107,107,.12); color:#ff6b6b;}
+.facet-items{display:flex; flex-wrap:nowrap; gap:12px; margin-top:6px; overflow-x:auto; padding:4px 4px 6px; scroll-snap-type:x mandatory; scrollbar-width:thin;}
+.facet-items::-webkit-scrollbar{height:12px; background:#0e1218;}
+/* Match dark theme: deep track + subtle outline */
+.facet-items::-webkit-scrollbar-track{background:#0e1218; border-radius:8px; box-shadow:inset 0 0 0 1px #1c2631;}
+.facet-items::-webkit-scrollbar-thumb{background:#2b3847; border-radius:8px; border:2px solid #0e1218; transition:background-color .2s ease, border-color .2s ease;}
+.facet-items::-webkit-scrollbar-thumb:hover{background:#3a4a65; border-color:#0e1218;}
+/* Firefox coloring */
+.facet-items{scrollbar-color:#2b3847 #0e1218;}
+.facet-items::-webkit-scrollbar-thumb:hover{background-color:#3a4a65;}
+.facet-item{flex:0 0 180px; scroll-snap-align:start; border:1px solid #1f2530; border-radius:14px; padding:10px 12px 12px; background:linear-gradient(155deg,#0f1620 0%, #101c28 55%, #0d141b 100%); display:grid; gap:6px; position:relative; box-shadow:0 4px 14px -4px rgba(0,0,0,.6);}
+.facet-item:hover{box-shadow:0 6px 20px -4px rgba(0,0,0,.75);}
+.facet-item.facet-green{border-color:rgba(111,227,161,.6); box-shadow:0 0 0 1px rgba(111,227,161,.35), 0 4px 14px -4px rgba(0,0,0,.7);}
+.facet-item.facet-yellow{border-color:rgba(255,196,86,.55); box-shadow:0 0 0 1px rgba(255,196,86,.35), 0 4px 14px -4px rgba(0,0,0,.7);}
+.facet-item.facet-red{border-color:rgba(255,107,107,.6); box-shadow:0 0 0 1px rgba(255,107,107,.35), 0 4px 14px -4px rgba(0,0,0,.75);}
+.facet-item.facet-gray{border-color:rgba(110,120,135,.45); opacity:.9;}
+.facet-item .fi-name{font-weight:650; font-size:10px; letter-spacing:.55px; text-transform:uppercase; opacity:.7;}
+.facet-item .fi-amazon{font-size:13px; font-weight:600; line-height:1.25; color:#e2ecf5;}
+.facet-item .fi-ebay{font-size:11px; color:#93a3b6; line-height:1.2; font-weight:500;}
+@media (max-width:820px){ .facet-item{flex:0 0 150px;} }
+
+/* Product card layout: image left (fixed), info right (flex) */
+.prod-inner{display:grid; grid-template-columns:160px 1fr; min-height:160px}
+.imgwrap{
+  background:#0e1218; display:flex; align-items:flex-start; justify-content:center;
+  padding:8px; border-right:1px solid var(--border); min-height:160px;
+}
+.imgwrap a{display:flex; width:100%; height:100%; align-items:flex-start; justify-content:center}
+.imgwrap img{max-width:100%; max-height:100%; object-fit:contain; align-self:flex-start}
+.prod-body{display:flex; flex-direction:column; gap:10px; padding:12px}
+
+/* Title clamp */
+.title{
+  display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden;
+}
+.title a{color:inherit; text-decoration:none}
+.title a:hover{text-decoration:underline}
+
+/* Essentials row */
+.essentials{display:flex; flex-wrap:wrap; gap:6px}
+.pill{display:inline-block; padding:2px 8px; border-radius:999px; font-size:12px; border:1px solid #273042; color:#cfd6e3; white-space:nowrap}
+.ok{color:var(--ok)!important; font-weight:700}
+.err{color:var(--error)!important; font-weight:700}
+.reasons{font-size:12px; color:#d6deea; line-height:1.35}
+
+/* Details dropdown (card-in-card) */
+details.extra{
+  margin-top:6px; background:#0e1218; border:1px solid var(--border); border-radius:10px;
+}
+details.extra>summary{
+  cursor:pointer; list-style:none; color:var(--muted); font-size:13px; user-select:none;
+  display:flex; align-items:center; gap:8px; padding:8px 10px;
+}
+details.extra>summary::before{content:"▸"; transition:transform .15s ease; display:inline-block; transform:translateY(1px)}
+details.extra[open]>summary{color:var(--accent)}
+details.extra[open]>summary::before{transform:rotate(90deg) translateX(1px)}
+
+/* Scrollable details body (prevents card from growing tall) */
+.extra-body{
+  max-height:180px; overflow:auto; padding:8px 10px 10px; border-top:1px solid var(--border);
+  /* Firefox */
+  scrollbar-width:thin; scrollbar-color:#273042 #0e1218;
+}
+/* WebKit scrollbars */
+.extra-body::-webkit-scrollbar{width:10px}
+.extra-body::-webkit-scrollbar-track{background:#0e1218; border-radius:8px}
+.extra-body::-webkit-scrollbar-thumb{background-color:#273042; border-radius:8px; border:2px solid #0e1218}
+.extra-body::-webkit-scrollbar-thumb:hover{background-color:#3a4a65}
+
+/* Key/Value grid */
+.kv{margin-top:6px; display:grid; grid-template-columns:140px 1fr; gap:6px 10px; align-items:start; font-size:13px}
+.key{color:var(--muted)}
+
+/* ===== Empty state ===== */
+.empty{border:1px dashed #273042; padding:18px; border-radius:12px; color:var(--muted); text-align:center}
+
+/* ===== Buttons ===== */
+.actions-inline{margin-top:10px; display:flex; gap:10px; justify-content:flex-start}
+.btn{appearance:none; border:0; border-radius:12px; padding:12px 14px; font-weight:650; cursor:pointer}
+.btn.primary{background:var(--accent); color:var(--accent-ink)}
+.btn.ghost{background:transparent; color:var(--ink); border:1px solid var(--border)}
+
+/* Modern switch */
+.switch-row{display:flex; align-items:center;}
+.switch{display:inline-flex; align-items:center; gap:10px; cursor:pointer; user-select:none; font-size:13px; font-weight:600; letter-spacing:.2px;}
+.switch input{position:absolute; opacity:0; pointer-events:none;}
+.switch .track{position:relative; width:46px; height:26px; background:#182131; border:1px solid #273042; border-radius:999px; transition:background .25s,border-color .25s; box-shadow:inset 0 2px 4px rgba(0,0,0,.55);}
+.switch .track::after{content:""; position:absolute; top:2px; left:2px; width:20px; height:20px; background:linear-gradient(145deg,#1c2532,#10171f); border-radius:50%; box-shadow:0 2px 4px rgba(0,0,0,.6),0 0 0 1px #1e2732; transition:transform .28s cubic-bezier(.55,.25,.25,.95), background .25s, box-shadow .25s;}
+.switch input:focus + .track{outline:2px solid #3a4a65; outline-offset:2px;}
+.switch input:checked + .track{background:linear-gradient(90deg,var(--accent) 0%, #4d7ad1 100%); border-color:var(--accent);}
+.switch input:checked + .track::after{transform:translateX(20px); background:linear-gradient(145deg,#fff,#d6e4ff); box-shadow:0 2px 6px -1px rgba(0,0,0,.55),0 0 0 1px rgba(255,255,255,.4);}
+.switch .label-text{font-weight:600; color:var(--ink);}
+.switch input:not(:checked) ~ .label-text{opacity:.85; font-weight:500;}
+.switch:hover .track{border-color:#3a4f69;}
+.switch input:active + .track::after{transform:translateX(0) scale(.9);} /* small press feedback if off */
+.switch input:checked:active + .track::after{transform:translateX(20px) scale(.9);} /* pressed on */
+
+/* ===== Debug dropdown ===== */
+details.debug.panel{padding:0;}
+details.debug.panel.debug-matching>summary{cursor:pointer; list-style:none; color:var(--muted); font-size:13px; user-select:none; display:flex; align-items:center; gap:8px; padding:14px 18px; border-bottom:1px solid var(--border); font-weight:600; letter-spacing:.2px;}
+/* Add breathing room below the debug panel */
+details.debug.panel.debug-matching{margin-bottom:20px;}
+details.debug.panel.debug-matching>summary::before{content:"▸"; transition:transform .15s ease; display:inline-block; transform:translateY(1px)}
+details.debug.panel.debug-matching[open]>summary{color:var(--accent)}
+details.debug.panel.debug-matching[open]>summary::before{transform:rotate(90deg) translateX(1px)}
+/* Unified collapsible summary spacing */
+details.debug>summary{
+  cursor:pointer; list-style:none; color:var(--muted); font-size:13px; user-select:none;
+  display:flex; align-items:center; gap:8px; padding:14px 18px; border-bottom:1px solid var(--border);
+}
+details.debug>summary::before{content:"▸"; transition:transform .15s ease; display:inline-block; transform:translateY(1px)}
+details.debug[open]>summary{color:var(--accent)}
+details.debug[open]>summary::before{transform:rotate(90deg) translateX(1px)}
+/* Inner body spacing normalized (no extra inset border/margins) */
+.debug-box{margin:0; padding:16px 18px 20px; border:0; background:transparent; border-radius:0}
+.debug-box pre{
+  white-space:pre-wrap; font-family:ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size:12px; line-height:1.4; color:#cfd6e3; margin:8px 0 0;
+}
+/* Phase-2 comparison styled to mirror debug panel */
+details.facet-panel.phase2{padding:0;}
+details.facet-panel.phase2>summary{
+  cursor:pointer; list-style:none; color:var(--muted); font-size:13px; user-select:none;
+  display:flex; align-items:center; gap:8px; padding:14px 18px; border-bottom:1px solid var(--border);
+  font-weight:600; letter-spacing:.2px;
+}
+details.facet-panel.phase2>summary::before{content:"▸"; transition:transform .15s ease; display:inline-block; transform:translateY(1px)}
+details.facet-panel.phase2[open]>summary{color:var(--accent)}
+details.facet-panel.phase2[open]>summary::before{transform:rotate(90deg) translateX(1px)}
+details.facet-panel.phase2 .debug-box{margin:0; padding:16px 18px 24px;}
+  </style>
+  <style>
+    .sort-select.tiny{background:#0e1218; color:var(--ink); border:1px solid #273042; border-radius:8px; padding:4px 8px; font-size:12px; font-weight:600; max-width:190px;}
+    .sort-select.tiny:focus{outline:none; border-color:#3a4a65;}
   </style>
 </head>
-<body>
+<body class="modern">
   <header>
-    <h1>ASIN → Keepa Product Verifier (Phase-1 Filter)</h1>
+    <div class="head-inner">
+      <h1>Automatic SnipeProductSub By Ronnie</h1>
+      <button type="button" id="themeToggle" class="theme-toggle" title="Toggle light/dark mode">🌗 Theme</button>
+    </div>
   </header>
+
   <main>
-    <form method="post" action="/analyze" autocomplete="off">
-      <div class="row">
-        <div class="field">
-          <label for="keepa_key">Keepa API key <span class="hint">(stored in your browser until you close/refresh)</span></label>
-          <input type="text" id="keepa_key" name="keepa_key" placeholder="KEEPA-API-KEY" required />
-        </div>
-        <div class="field">
-          <label for="ebay_title">eBay Title (fallback search) — required</label>
-          <input type="text" id="ebay_title" name="ebay_title" placeholder="Paste an eBay listing title…" required />
-          <div class="hint">If Amazon links are empty, we’ll query Product Finder with this title and pull the 25 cheapest (current NEW).</div>
-        </div>
-      </div>
-
+    <!-- One form to submit everything -->
+    <script>
+    (function(){
+      function byId(id){return document.getElementById(id);}    
+      function onReady(fn){
+        if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', fn); else fn();
+      }
+      onReady(() => {
+        async function readClipboard(){
+          if(!navigator.clipboard || !navigator.clipboard.readText){
+            throw new Error('Clipboard API not available');
+          }
+          return await navigator.clipboard.readText();
+        }
+        async function pasteInto(targetId){
+          const el = byId(targetId);
+          if(!el) return;
+          try {
+            const txt = await readClipboard();
+            if(!txt){ toast('Clipboard empty'); return; }
+            el.value = txt;
+            autoResizeTextarea(el);
+            flash(el);
+          } catch(e){
+            console.warn('Clipboard read failed', e);
+            toast('Clipboard read failed');
+          }
+        }
+        function flash(el){
+          el.classList.add('flash-paste');
+          setTimeout(()=>el.classList.remove('flash-paste'), 700);
+        }
+        function autoResizeTextarea(t){
+          if(!(t && t.tagName === 'TEXTAREA')) return;
+          t.style.height = 'auto';
+          const maxH = parseInt(getComputedStyle(t).getPropertyValue('max-height')) || 380;
+          t.style.height = Math.min(t.scrollHeight + 2, maxH) + 'px';
+        }
+        function toast(msg){
+          let box = document.createElement('div');
+          box.textContent = msg;
+          box.style.cssText = 'position:fixed;bottom:18px;left:50%;transform:translateX(-50%);background:#182131;color:#dce6f4;padding:10px 16px;border:1px solid #273042;border-radius:10px;font:12px system-ui, sans-serif;z-index:9999;box-shadow:0 4px 12px -4px rgba(0,0,0,.6);';
+          document.body.appendChild(box);
+          setTimeout(()=>{ box.style.opacity='0'; box.style.transition='opacity .4s'; }, 1800);
+          setTimeout(()=> box.remove(), 2300);
+        }
+        // Attempt immediate attach; if not present yet, observe DOM
+        function attach(){
+          const ebayBtn = byId('pasteEbayBtn');
+          const amazonBtn = byId('pasteAmazonBtn');
+          if(ebayBtn && !ebayBtn.dataset._clip){
+            ebayBtn.addEventListener('click', () => pasteInto('ebay_data'));
+            ebayBtn.dataset._clip = '1';
+          }
+          if(amazonBtn && !amazonBtn.dataset._clip){
+            amazonBtn.addEventListener('click', () => pasteInto('amazon_links'));
+            amazonBtn.dataset._clip = '1';
+          }
+          if(ebayBtn && amazonBtn) return true;
+          return false;
+        }
+        if(!attach()){
+          const mo = new MutationObserver(() => { if(attach()){ mo.disconnect(); }});
+          mo.observe(document.documentElement, {childList:true, subtree:true});
+          // Safety timeout
+          setTimeout(()=> mo.disconnect(), 5000);
+        }
+      });
+    })();
+    </script>
+    <style>
+      .flash-paste{outline:2px solid var(--accent); transition:outline-color .6s ease;}
+      .flash-paste:focus{outline:2px solid var(--accent);} /* keep consistent */
+    </style>
+    <form method="post" action="/analyze" autocomplete="off" class="app" novalidate>
+      <aside class="sidebar">
+  <!-- Keys (open by default) -->
+  <details class="block" open>
+    <summary>
+      <span class="h">Keys</span>
+      <span class="caret">▸</span>
+    </summary>
+    <div class="section-body">
       <div class="field">
-        <label for="amazon_links">Amazon URLs or ASINs (optional, one per line)</label>
-        <textarea id="amazon_links" name="amazon_links" placeholder="https://www.amazon.com/dp/B0... or ASIN only (one per line)"></textarea>
+        <label for="keepa_key">Keepa API key <span class="hint">(hold 👁 to reveal)</span></label>
+        <div class="input-with-reveal">
+          <input type="password" id="keepa_key"  name="keepa_key"
+       placeholder="KEEPA-API-KEY"  autocomplete="current-password" spellcheck="false">
+          <button type="button" id="reveal_key" class="reveal-btn" aria-label="Hold to reveal key">👁</button>
+        </div>
       </div>
-
-      <div class="actions">
-        <button type="submit">Fetch & Filter</button>
+      <div class="field">
+        <label for="openai_key">OpenAI API key <span class="hint">(hold 👁)</span></label>
+        <div class="input-with-reveal">
+          <input type="password" id="openai_key" name="openai_key"
+       placeholder="OPENAI-API-KEY" autocomplete="current-password" spellcheck="false">
+          <button type="button" id="reveal_openai" class="reveal-btn">👁</button>
+        </div>
       </div>
-    </form>
-
-    {% if summary %}
-      <div class="summary">
-        <strong>{{ summary.passed }}</strong> matched out of <strong>{{ summary.checked }}</strong> checked.
-        Showing only those that passed Phase-1.
+      <div class="field">
+        <label for="openai_model">OpenAI Model</label>
+        <select id="openai_model" name="openai_model">
+          <option value="gpt-4o-mini" selected>gpt-4o-mini (default)</option>
+          <option value="gpt-4o">gpt-4o</option>
+          <option value="gpt-4.1">gpt-4.1</option>
+          <option value="gpt-4.1-mini">gpt-4.1-mini</option>
+          <option value="gpt-3.5-turbo">gpt-3.5-turbo</option>
+        </select>
       </div>
-    {% endif %}
+    </div>
+  </details>
 
-    {% if batch and batch|length > 0 %}
-      <div class="grid">
-        {% for item in batch %}
-          {% set r = item.result %}
-          <div class="card">
-            <div class="imgwrap">
-              {% if r and r.imageURL %}
-                <img src="{{ r.imageURL }}" alt="image for {{ r.title or r.asin }}" loading="lazy">
-              {% else %}
-                <span class="hint" style="padding:8px;">No image</span>
-              {% endif %}
-            </div>
-            <div class="meta">
-              <div class="title">{{ r.title or '—' }}</div>
-              <div class="kv">
-                <div class="key">ASIN</div><div>{{ r.asin }}</div>
-                <div class="key">Brand</div><div>{{ r.brand or '—' }}</div>
-                <div class="key">MPN</div><div>{{ r.mpn or '—' }}</div>
-                <div class="key">Group</div><div>{{ r.productGroup or '—' }}</div>
-                <div class="key">Category</div><div>{{ r.categoryLeaf or '—' }}</div>
-                <div class="key">Color</div><div>{{ r.color or '—' }}</div>
-                <div class="key">Size</div><div>{{ r.size or '—' }}</div>
-                <div class="key">Pack Qty</div><div>{{ r.packageQuantity or r.numberOfItems or '—' }}</div>
-                <div class="key">Price</div><div>{% if r.currentPriceUSD is not none %}${{ '%.2f'|format(r.currentPriceUSD) }}{% else %}—{% endif %}</div>
+  <!-- Finder Options -->
+  <details class="block">
+    <summary>
+      <span class="h">Finder Options</span>
+      <span class="caret">▸</span>
+    </summary>
+    <div class="section-body">
+      <div class="field">
+        <label for="want_n">How many cheapest to pull</label>
+        <div class="slider-row">
+          <input type="range" class="fee-slider" id="want_n_slider" min="1" max="50" value="25" />
+          <input type="number" class="inline-number" id="want_n" name="want_n" min="1" max="50" step="1" value="25" />
+        </div>
+        <div class="hint small">We’ll fetch up to 50 from Product Finder (NEW) and take the first <strong id="want_n_hint">25</strong>, cheapest first.</div>
+      </div>
+      <div class="field">
+        <label for="yellow_multiplier">Yellow facet weight multiplier <span class="hint">(0–1, default 0.5)</span></label>
+        <div class="slider-row">
+          <input type="range" class="fee-slider" id="yellow_multiplier_slider" min="0" max="1" step="0.1" value="0.5" />
+          <input type="number" class="inline-number" id="yellow_multiplier" name="yellow_multiplier" min="0" max="1" step="0.1" value="0.5" />
+        </div>
+      </div>
+      <div class="field">
+        <label for="min_score_pct">Min Phase-2 score (%) <span class="hint">(40–95, default 70)</span></label>
+        <div class="slider-row">
+          <input type="range" class="fee-slider" id="min_score_pct_slider" min="40" max="95" step="1" value="70" />
+          <input type="number" class="inline-number" id="min_score_pct" name="min_score_pct" min="40" max="95" step="1" value="70" />
+        </div>
+      </div>
+      <div class="field">
+        <div class="switch-row">
+          <label class="switch" title="Toggle brand stripping in Product Finder">
+            <input type="checkbox" id="strip_brand" name="strip_brand" value="1" />
+            <span class="track"></span>
+            <span class="label-text">Remove brand from Product Finder search</span>
+          </label>
+        </div>
+        <div class="hint small" id="stripBrandHint">When ON, GPT will drop brand names (Nike, Samsung, etc.) before querying Keepa.</div>
+      </div>
+    </div>
+  </details>
 
-                <div class="key">Score</div>
-                <div class="{{ 'ok' if item.match.score >= 0.7 else 'warn' }}">{{ '%.2f'|format(item.match.score) }}</div>
-              </div>
+  <!-- Fees & Thresholds -->
+  <details class="block">
+    <summary>
+      <span class="h">Fees & Thresholds</span>
+      <span class="caret">▸</span>
+    </summary>
+    <div class="section-body">
+      <!-- Dynamic fee controls -->
+      <div class="field">
+        <label for="ebay_fee_pct">eBay fee (%) <span class="hint">(5–30, default {{ (EBAY_FEE_PCT*100)|round(0) }})</span></label>
+        <div class="slider-row">
+          <input type="range" class="fee-slider" id="ebay_fee_pct_slider" min="5" max="30" value="{{ (EBAY_FEE_PCT*100)|round(0) }}" />
+          <input type="number" class="inline-number" id="ebay_fee_pct" name="ebay_fee_pct" min="5" max="30" step="0.1" value="{{ '%.1f'|format(EBAY_FEE_PCT*100) }}" />
+        </div>
+      </div>
+      <div class="field">
+        <label for="ad_fee_pct">Advertising fee (%) <span class="hint">(0–20, default {{ (AD_FEE_PCT*100)|round(0) }})</span></label>
+        <div class="slider-row">
+          <input type="range" class="fee-slider" id="ad_fee_pct_slider" min="0" max="20" value="{{ (AD_FEE_PCT*100)|round(0) }}" />
+          <input type="number" class="inline-number" id="ad_fee_pct" name="ad_fee_pct" min="0" max="20" step="0.1" value="{{ '%.1f'|format(AD_FEE_PCT*100) }}" />
+        </div>
+      </div>
+      <div class="fees" style="margin-top:4px;">
+        <div class="k" style="align-self:start;">Undercut</div>
+        <div class="v" style="width:100%;">
+          <div class="slider-row">
+            <input type="range" class="fee-slider" id="undercut_amount_slider" min="0" max="1" step="0.05" value="{{ '%.2f'|format(UNDERCUT_AMOUNT) }}" />
+            <input type="number" class="inline-number" id="undercut_amount" name="undercut_amount" min="0" max="1" step="0.05" value="{{ '%.2f'|format(UNDERCUT_AMOUNT) }}" />
+          </div>
+        </div>
+        <div class="k" style="align-self:start;">Min margin</div>
+        <div class="v" style="width:100%;">
+          <div class="slider-row">
+            <input type="range" class="fee-slider" id="min_margin_pct_slider" min="-10" max="200" step="5" value="{{ '%.0f'|format(MIN_MARGIN_PCT) }}" />
+            <input type="number" class="inline-number" id="min_margin_pct" name="min_margin_pct" min="-10" max="200" step="1" value="{{ '%.0f'|format(MIN_MARGIN_PCT) }}" />
+          </div>
+        </div>
+      </div>
+      <div class="hint small">Values are percent-of-sell price. Both are also clamped server-side.</div>
+    </div>
+  </details>
 
-              {% if r.upcList or r.eanList %}
-                <div class="idlist" style="margin-top:4px;">
-                  {% if r.upcList %}<div>UPC: {{ r.upcList|join(', ') }}</div>{% endif %}
-                  {% if r.eanList %}<div>EAN: {{ r.eanList|join(', ') }}</div>{% endif %}
-                </div>
-              {% endif %}
+  <!-- How it works -->
+  <details class="block">
+    <summary>
+      <span class="h">How it works</span>
+      <span class="caret">▸</span>
+    </summary>
+    <div class="section-body">
+      <div class="steps">
+        <div class="step"><div class="num">1</div><div class="txt">Paste eBay JSON or supply Amazon links/ASINs.</div></div>
+        <div class="step"><div class="num">2</div><div class="txt">If links are empty, Product Finder pulls <em>N</em> cheapest NEW results from the title.</div></div>
+        <div class="step"><div class="num">3</div><div class="txt">We compute sell price (undercut), fees, profit, and margin.</div></div>
+        <div class="step"><div class="num">4</div><div class="txt">Phase-1 gate keeps only items hitting the min margin and basic match rules.</div></div>
+      </div>
+    </div>
+  </details>
+  <!-- Standalone eBay Product card -->
+  <div class="ebay-product-card" id="sidebarEbayProduct" style="display:none;">
+    <div class="ep-head"><h4 class="ep-title">Ebay Product (Preview)</h4></div>
+    <div class="ep-body">
+      <div id="sidebarEbayLinkWrap"></div>
+    </div>
+  </div>
+  {% if EBAY_SUB %}
+  <div class="ebay-product-card" id="sidebarEbayProductSubmitted">
+    <div class="ep-head"><h4 class="ep-title">Ebay Product (Submitted)</h4></div>
+    <div class="ep-body">
+      {% set _sub = EBAY_SUB %}
+      {% if _sub.title %}
+        {% if _sub.itemNumber %}
+          <a href="https://www.ebay.com/itm/{{ _sub.itemNumber }}" target="_blank" rel="noopener">{{ _sub.title }}</a>
+        {% else %}
+          <div style="font-weight:600; color:var(--accent);">{{ _sub.title }}</div>
+        {% endif %}
+      {% else %}
+        <div class="placeholder">(No submitted eBay title)</div>
+      {% endif %}
+      {% if _sub.price is not none %}
+        <div class="hint" style="margin-top:4px;">Price: ${{ '%.2f'|format(_sub.price) }}</div>
+      {% endif %}
+      {% if _sub.itemNumber %}
+        <div class="hint" style="font-size:11px; opacity:.7;">Item #: {{ _sub.itemNumber }}</div>
+      {% endif %}
+    </div>
+  </div>
+  {% endif %}
+</aside>
 
-              {% if item.match.reasons %}
-                <div class="reasons">
-                  {% for reason in item.match.reasons %}
-                    • {{ reason }}<br/>
-                  {% endfor %}
-                </div>
-              {% endif %}
 
-              <div class="hint" style="margin-top:6px;">Input: {{ item.input }}</div>
+      <!-- Content column (inputs, buttons, results, debug) -->
+      <section class="content">
+  <!-- Stack wrapper start -->
+  <div class="stack">
+  <!-- Input panel -->
+  <div class="panel stack-item" id="inputPanel">
+          <div class="field" style="margin-bottom:10px;">
+            <label for="ebay_data">eBay data (JSON)</label>
+            <textarea id="ebay_data" name="ebay_data" rows="3" placeholder='{"title":"...","price":58.39,"itemNumber":"..."}'></textarea>
+            <div class="hint" style="margin-top:6px;">
+              If Amazon links are empty, we’ll query Product Finder and pull the cheapest NEW results.
             </div>
           </div>
-        {% endfor %}
+          <div class="field">
+            <label for="amazon_links">Amazon URLs or ASINs (optional, one per line)</label>
+            <textarea id="amazon_links" name="amazon_links" rows="3" placeholder="https://www.amazon.com/dp/B0... or ASIN only (one per line)"></textarea>
+          </div>
+
+          <!-- ✅ Buttons under inputs -->
+          <div class="actions-inline">
+            <button type="submit" class="btn primary" title="Run Phase-1">Fetch & Filter</button>
+            <button type="reset" id="reset_btn" class="btn ghost">Reset</button>
+            <button type="button" id="pasteEbayBtn" class="btn ghost" title="Paste clipboard text into eBay JSON box">Paste eBay Data</button>
+            <button type="button" id="pasteAmazonBtn" class="btn ghost" title="Paste clipboard text into Amazon links box">Paste Amazon Links</button>
+          </div>
+        </div>
+          
+  {% if progress %}
+  <div class="progress-card stack-item"
+     id="progressCard"
+     data-rid="{{ rid }}"
+     data-waiting="{{ 'true' if waiting else 'false' }}"
+     data-progress='{{ progress_json|safe }}'>
+
+  <div class="progress-header">
+    <div class="progress-title">Run progress</div>
+    <div class="progress-meta" style="display:flex; align-items:baseline; gap:10px; font-variant-numeric:tabular-nums;">
+      <div class="progress-percent" id="progressPct">{{ progress.percent }}%</div>
+      <div id="progressEta" class="progress-eta" style="font-size:11px; color:var(--muted); opacity:.85; letter-spacing:.3px;">ETA —</div>
+    </div>
+  </div>
+
+  <!-- Live single-line progress (used by progress.js) -->
+<div id="runProgress" class="progress">
+  <div class="track">
+    <div class="bar" role="progressbar" aria-valuemin="0" aria-valuemax="100"
+         style="width: {{ progress.percent }}%"></div>
+  </div>
+  <div class="label">
+    {% if progress.steps %}{{ progress.steps[-1].label }}{% else %}Starting…{% endif %}
+  </div>
+</div>
+
+
+  <!-- (optional) compact summary; keep hidden during run to avoid double text -->
+  <ul class="progress-summary" id="progressSummary" style="display:none">
+    {% for s in progress.steps %}
+      <li>{{ s.label }} — {{ s.summary }}</li>
+    {% endfor %}
+  </ul>
+
+  <!-- expander -->
+  <div class="toggle" id="progressToggle" aria-expanded="false" style="margin-top:8px">
+    <svg class="chev" id="progressChev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+      <path d="M6 9l6 6 6-6"/>
+    </svg>
+    <span>Show progress log</span>
+  </div>
+
+  <!-- full log -->
+  <div class="progress-log-wrapper">
+  <div class="log" id="progressLog">
+    {% for s in progress.steps %}
+      <div class="log-row">
+        <div class="log-time" data-ts="{{ '%.3f'|format(s.ts) }}"></div>
+        <div>
+          <div class="log-label">{{ s.label }}</div>
+          <div class="log-detail">{{ s.detail if s.detail else s.summary }}</div>
+        </div>
       </div>
-    {% else %}
-      <div class="empty" style="margin-top:16px;">Results will appear here.</div>
-    {% endif %}
+    {% endfor %}
+  </div>
+  </div>
+        </div>
+        {% endif %}
+
+
+  {% if batch and batch|length > 0 %}
+          <details class="panel results-panel stack-item details-collapsible" id="resultsPanel" open>
+            <summary>
+              {% if summary %}
+                {# Replace pass rate with Min Score threshold chip (from phase2_meta if available) #}
+                {% set min_score_threshold = (phase2_meta.min_score_pct if phase2_meta and phase2_meta.min_score_pct is not none else MIN_SCORE_PCT_DEFAULT if MIN_SCORE_PCT_DEFAULT is defined else None) %}
+                <div class="results-head">
+                  <div class="results-summary">
+                    <strong>{{ summary.passed }}</strong> matched out of <strong>{{ summary.checked }}</strong> checked <span class="sep">•</span> Showing only those that passed.
+                    <div class="metric-chips">
+                      {% if min_score_threshold is not none %}
+                        {# Determine color class: green for 75–95, yellow for 40–74, else default (no extra class) #}
+                        {% set _ms = min_score_threshold|float %}
+                        {% if _ms >= 75 %}
+                          {% set chip_cls = 'green' %}
+                        {% elif _ms >= 40 %}
+                          {% set chip_cls = 'yellow' %}
+                        {% else %}
+                          {% set chip_cls = '' %}
+                        {% endif %}
+                        <div class="metric-chip {{ chip_cls }}"><span>Min Score</span> <strong>{{ '%.0f'|format(min_score_threshold) }}%</strong></div>
+                      {% endif %}
+                      <div class="metric-chip"><span>Total Shown</span> <strong>{{ batch|length }}</strong></div>
+                    </div>
+                  </div>
+                  <span class="caret">▸</span>
+                </div>
+              {% else %}
+                <div class="results-head" style="justify-content:space-between;">
+                  <div class="results-summary">Results</div>
+                  <span class="caret">▸</span>
+                </div>
+              {% endif %}
+            </summary>
+            <div class="results-body">
+              <div style="padding:10px 14px 0; display:flex; align-items:center;">
+                <select id="resultsSort" class="sort-select tiny">
+                  <option value="best" selected>Best (Score+Profit)</option>
+                  <option value="combined_desc">Profit/Margin High→Low</option>
+                  <option value="combined_asc">Profit/Margin Low→High</option>
+                  <option value="score_desc">Score High→Low</option>
+                  <option value="score_asc">Score Low→High</option>
+                </select>
+              </div>
+              <div class="grid" id="resultsGrid">
+              {% for item in batch %}
+              {% set r = item.result %}
+              {% set p = item.pricing %}
+              {% set product_url = r.asin and ('https://www.amazon.com/dp/' ~ r.asin) or None %}
+              {% set profit_class = 'ok' if p.profitUSD is not none and p.profitUSD >= 0 else 'err' %}
+                      {% set margin_ok = (p.marginPct is not none and p.marginPct >= 0) %}
+              {% set llm_class = 'ok' if item.match and item.match.passed else 'err' %}
+              <div class="prod" data-profit="{{ p.profitUSD if p.profitUSD is not none else '' }}" data-margin="{{ p.marginPct if p.marginPct is not none else '' }}" data-score="{{ item.match.score if item.match and item.match.score is not none else '' }}">
+                <div class="prod-inner">
+                  <!-- LEFT: image -->
+                  <div class="imgwrap">
+                    {% if r and r.imageURL %}
+                      {% if product_url %}
+                        <a href="{{ product_url }}" target="_blank" rel="noopener">
+                          <img src="{{ r.imageURL }}" alt="image for {{ r.title or r.asin }}" loading="lazy">
+                        </a>
+                      {% else %}
+                        <img src="{{ r.imageURL }}" alt="image for {{ r.title or r.asin }}" loading="lazy">
+                      {% endif %}
+                    {% else %}
+                      <span class="hint" style="padding:8px;">No image</span>
+                    {% endif %}
+                  </div>
+
+                  <!-- RIGHT: content -->
+                  <div class="prod-body">
+                    <!-- Title -->
+                    <div class="title">
+                      {% if product_url %}
+                        <a href="{{ product_url }}" target="_blank" rel="noopener">{{ r.title or r.asin }}</a>
+                      {% else %}
+                        {{ r.title or '—' }}
+                      {% endif %}
+                    </div>
+
+                    <!-- Pills: Profit / Margin / LLM -->
+                    <div class="essentials">
+                      <span class="pill {{ profit_class }}">Profit:
+                        {% if p.profitUSD is not none %}${{ '%.2f'|format(p.profitUSD) }}{% else %}—{% endif %}
+                      </span>
+                      <span class="pill {{ 'ok' if margin_ok else 'err' }}">Margin:
+                        {% if p.marginPct is not none %}{{ '%.2f'|format(p.marginPct) }}%{% else %}—{% endif %}
+                      </span>
+                      <span class="pill {{ llm_class }}">Score:
+                        {% if item.match and item.match.score is not none %}{{ '%.2f'|format(item.match.score) }}{% else %}—{% endif %}
+                      </span>
+                    </div>
+
+                    <!-- Reasons (under pills) -->
+                    {% if item.match.reasons %}
+                      <div class="reasons">
+                        {# Suppress auto-added score reason lines that start with 'Score ' #}
+                        {% for reason in item.match.reasons %}
+                          {% if not reason.startswith('Score ') %}• {{ reason }}<br/>{% endif %}
+                        {% endfor %}
+                      </div>
+                    {% endif %}
+
+                    {# Phase-2 comparison moved below debug panel #}
+
+                    
+
+                    <!-- Full-width More details (includes size & weight) -->
+                    <details class="extra">
+                      <summary>More details</summary>
+                      <div class="extra-body">
+                        <div class="kv">
+                          <div class="key">ASIN</div><div>{{ r.asin }}</div>
+                          <div class="key">Brand</div><div>{{ r.brand or '—' }}</div>
+                          <div class="key">MPN</div><div>{{ r.mpn or '—' }}</div>
+                          <div class="key">Group</div><div>{{ r.productGroup or '—' }}</div>
+                          <div class="key">Category</div><div>{{ r.categoryLeaf or '—' }}</div>
+                          <div class="key">Color</div><div>{{ r.color or '—' }}</div>
+                          <div class="key">Size String</div><div>{{ r.size or '—' }}</div>
+                          <div class="key">Pack Qty</div><div>{{ r.packageQuantity or r.numberOfItems or '—' }}</div>
+                          <div class="key">Unit Count</div><div>{{ r.unitCount if r.unitCount is not none else '—' }}</div>
+                          <div class="key">Amazon Price</div>
+                          <div>{% if r.currentPriceUSD is not none %}${{ '%.2f'|format(r.currentPriceUSD) }}{% else %}—{% endif %}</div>
+
+                          <div class="key">eBay List</div><div>${{ '%.2f'|format(p.ebayListPriceUSD) }}</div>
+                          <div class="key">Sell @ (-${{ '%.2f'|format(UNDERCUT_AMOUNT) }})</div>
+                          <div>${{ '%.2f'|format(p.sellPriceUSD) }}</div>
+                          <div class="key">eBay Fee ({{ (p.fees.ebayFeePct*100)|round(0) }}%)</div>
+                          <div>${{ '%.2f'|format(p.fees.ebayFeeUSD) }}</div>
+                          <div class="key">Ads Fee ({{ (p.fees.adFeePct*100)|round(0) }}%)</div>
+                          <div>${{ '%.2f'|format(p.fees.adFeeUSD) }}</div>
+                          <div class="key">Fees Total</div><div>${{ '%.2f'|format(p.fees.totalUSD) }}</div>
+                          <div class="key">Net Revenue</div><div>${{ '%.2f'|format(p.netRevenueUSD) }}</div>
+
+                          <div class="key">Item Dims (mm)</div>
+                          <div>
+                            {% if r.itemLength not in [None,-1,-2] %}
+                              {{ r.itemLength }} × {{ r.itemWidth }} × {{ r.itemHeight }}
+                            {% else %}—{% endif %}
+                          </div>
+                          <div class="key">Package Dims (mm)</div>
+                          <div>
+                            {% if r.packageLength not in [None,-1,-2] %}
+                              {{ r.packageLength }} × {{ r.packageWidth }} × {{ r.packageHeight }}
+                            {% else %}—{% endif %}
+                          </div>
+                          <div class="key">Item Weight (g)</div>
+                          <div>{% if r.itemWeight not in [None,-1,-2] %}{{ r.itemWeight }}{% else %}—{% endif %}</div>
+                          <div class="key">Package Weight (g)</div>
+                          <div>{% if r.packageWeight not in [None,-1,-2] %}{{ r.packageWeight }}{% else %}—{% endif %}</div>
+
+                          {% if r.upcList or r.eanList %}
+                            <div class="key">IDs</div>
+                            <div class="idlist" style="font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12px;color:#cfd6e3;">
+                              {% if r.upcList %}<div>UPC: {{ r.upcList|join(', ') }}</div>{% endif %}
+                              {% if r.eanList %}<div>EAN: {{ r.eanList|join(', ') }}</div>{% endif %}
+                            </div>
+                          {% endif %}
+                        </div>
+
+                        {% if p.reasons %}
+                          <div class="reasons" style="margin-top:6px;">
+                            {% for reason in p.reasons %}• {{ reason }}<br/>{% endfor %}
+                          </div>
+                        {% endif %}
+
+                        <div class="hint" style="margin-top:6px;">Input: {{ item.input }}</div>
+                        <div class="hint" style="opacity:.6;margin-top:4px;">Keepa supplies mm & grams (no conversion).</div>
+                      </div>
+                    </details>
+                    <!-- END size & weight -->
+                  </div>
+                </div>
+              </div>
+
+      {% endfor %}
+    </div> <!-- /grid -->
+    </div> <!-- /results-body -->
+  </details> <!-- /results-panel -->
+{% else %}
+  <div class="panel"><div class="empty">Results will appear here.</div></div>
+{% endif %}
+
+    {% if phase2_all_rows %}
+  <details class="facet-panel phase2 stack-item details-collapsible" id="comparisonGrid">
+          <summary>
+            <span>Phase-2 Comparison (All Candidates)</span>
+            <span style="font-size:12px; color:var(--muted); font-weight:500;">(click to expand)</span>
+          </summary>
+          <div class="debug-box">
+            <div class="phase2-sort" style="display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin:0 0 6px 0;">
+              <select id="phase2Sort" class="sort-select tiny">
+                <option value="best" selected>Best (Score+Profit)</option>
+                <option value="failed_highprofit">Failed (Highest Profit)</option>
+                <option value="combined_desc">Profit/Margin High→Low</option>
+                <option value="combined_asc">Profit/Margin Low→High</option>
+                <option value="score_desc">Score High→Low</option>
+                <option value="score_asc">Score Low→High</option>
+              </select>
+            </div>
+            <div class="facet-meta" style="margin-top:0;">
+              {% if phase2_meta %}
+                <div>Yellow weight multiplier: {{ '%.2f'|format(phase2_meta.yellow_multiplier) }} · Min score: {{ '%.0f'|format(phase2_meta.min_score_pct) }}%</div>
+                <div style="margin-top:2px;">Gray = eBay facet absent (neutral & unscored).</div>
+              {% endif %}
+            </div>
+            <div class="legend" style="margin-top:10px;">
+              <span><span class="facet-dot dot-green"></span>Green</span>
+              <span><span class="facet-dot dot-yellow"></span>Yellow</span>
+              <span><span class="facet-dot dot-red"></span>Red</span>
+              <span><span class="facet-dot dot-gray"></span>Gray</span>
+            </div>
+            {% set facet_keys = ['product_type','functional_feature','compatibility','material','brand','color','quantity','vague_descriptor','marketing'] %}
+            <div class="facet-scroll" style="margin-top:12px;">
+              <table class="facet-reflow">
+                <thead>
+                  <tr>
+                    <th style="width:72px;">Image</th>
+                    <th>Title / ASIN</th>
+                    <th style="width:140px;">Profit / Margin</th>
+                    <th style="width:110px;">Score</th>
+                  </tr>
+                </thead>
+                <tbody>
+                {% for row in phase2_all_rows %}
+                  {% set facets = row.facetComparison or {} %}
+                  {% set r = row.result or {} %}
+                  {% set pricing = row.pricing or {} %}
+                  <tr class="facet-top-row">
+                    <td data-profit="{{ (pricing.profitUSD) if pricing and pricing.profitUSD is not none else '' }}" data-margin="{{ (pricing.marginPct) if pricing and pricing.marginPct is not none else '' }}" data-score="{{ row.match.score if row.match and row.match.score is not none else '' }}" data-passed="{{ '1' if row.match and row.match.passed else '0' }}">
+                      {% if r.imageURL %}<img src="{{ r.imageURL }}" alt="{{ row.asin }}" style="width:60px; height:60px; object-fit:contain; display:block;" loading="lazy" />{% else %}<span class="hint" style="font-size:10px;">no img</span>{% endif %}
+                    </td>
+                    <td class="title-cell">
+                      {% if row.asin %}<a href="https://www.amazon.com/dp/{{ row.asin }}" target="_blank" rel="noopener">{{ r.title or row.asin }}</a>{% else %}—{% endif %}
+                      <div style="font-size:11px; color:var(--muted); margin-top:2px;">ASIN: {{ row.asin }}</div>
+                    </td>
+                    <td class="pm-cell" style="font-size:12px; font-variant-numeric:tabular-nums;">
+                      {% if pricing and pricing.profitUSD is not none %}
+                        {% set pval = pricing.profitUSD %}
+                        {% set mval = pricing.marginPct %}
+                        {% set pcls = 'ok' if pval >= 0 else 'err' %}
+                        {% set mcls = 'ok' if (mval is not none and mval >= 0) else 'err' %}
+                        <div><span class="pill {{ pcls }}" style="padding:2px 6px; font-size:11px;">P: {{ '$%.2f'|format(pval) }}</span></div>
+                        <div style="margin-top:4px;"><span class="pill {{ mcls }}" style="padding:2px 6px; font-size:11px;">M: {% if mval is not none %}{{ '%.2f'|format(mval) }}%{% else %}—{% endif %}</span></div>
+                      {% else %}
+                        <span class="hint" style="font-size:11px;">—</span>
+                      {% endif %}
+                    </td>
+                    <td>
+                      {% if row.match %}
+                        {% set score_cls = 'ok' if row.match.passed else 'err' %}
+                        <span class="score-badge {{ score_cls }}">{{ '%.2f'|format(row.match.score) }}%</span>
+                      {% else %}<span class="hint" style="font-size:11px;">—</span>{% endif %}
+                    </td>
+                  </tr>
+                  <tr class="facet-bottom-row">
+                    <td colspan="4" style="padding-top:4px;">
+                      <div class="facet-items">
+                        {% for fk in facet_keys %}
+                          {% set f = facets.get(fk) %}
+                          {% if f %}
+                            {% set ebay_missing = (f.ebay is none) or (f.ebay|string == '') %}
+                            {% set st_backend = f.status or 'gray' %}
+                            {% set st = 'gray' if ebay_missing else st_backend %}
+                            {% set amazon_v = f.amazon %}
+                            {% set ebay_v = f.ebay %}
+                            {% set note = f.note %}
+                            <div class="facet-item facet-{{ st }}" title="Facet: {{ fk }}\nAmazon: {{ amazon_v or '—' }}\neBay: {{ ebay_v or '—' }}\nStatus: {{ st }}{% if note %}\nNote: {{ note }}{% endif %}">
+                              <div class="fi-name">{{ fk }}</div>
+                              <div class="fi-amazon">{{ amazon_v or '—' }}</div>
+                              {% if ebay_v %}<div class="fi-ebay">{{ ebay_v }}</div>{% endif %}
+                              {% if note %}<div class="facet-note" style="font-size:9px; margin-top:2px; line-height:1.2;">{{ note|truncate(60, True, '…') }}</div>{% endif %}
+                            </div>
+                          {% else %}
+                            <div class="facet-item facet-gray">
+                              <div class="fi-name">{{ fk }}</div>
+                              <div class="fi-amazon">—</div>
+                            </div>
+                          {% endif %}
+                        {% endfor %}
+                      </div>
+                    </td>
+                  </tr>
+                {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </details>
+        {% endif %}
+        <!-- ✅ Debug collapsible (moved below Phase-2) -->
+  {% if keepa_query or llm_raw_output %}
+          <details class="debug panel debug-matching stack-item details-collapsible" id="debugPanel">
+            <summary>
+              <span>🔎 Debug (click to expand)</span>
+              <span style="font-size:12px; color:var(--muted); font-weight:500;">(click to expand)</span>
+            </summary>
+            <div class="debug-box">
+              {% if keepa_query %}
+                <p class="hint" style="margin:0 0 6px 0;">
+                  <strong>Keepa query sent to GPT:</strong>
+                  <span style="color:#cfd6e3;">{{ keepa_query }}</span>
+                </p>
+              {% endif %}
+              {% if llm_raw_output %}
+                <p class="hint" style="margin:0;"><strong>GPT Raw Output (JSON):</strong></p>
+                <pre>{{ llm_raw_output }}</pre>
+              {% endif %}
+            </div>
+          </details>
+        {% endif %}
+        </div> <!-- /stack wrapper end -->
+
+        {% if progress %}
+<script>
+(function(){
+  const card = document.getElementById('progressCard');
+  if (!card) return;
+  const rid = card.dataset.rid;
+  const waiting = card.dataset.waiting === 'true';
+  const bar = document.querySelector('#runProgress .bar');
+  const labelEl = document.querySelector('#runProgress .label');
+  const pctEl = document.getElementById('progressPct');
+  const logEl = document.getElementById('progressLog');
+  const summary = document.getElementById('progressSummary');
+  function formatTimestamp(sec){
+    const d = new Date((sec||0)*1000); return { short:d.toLocaleTimeString([], {hour12:false,hour:'2-digit',minute:'2-digit',second:'2-digit'}), full:d.toLocaleString() };
+  }
+  function backfillSSR(){ if(!logEl) return; logEl.querySelectorAll('.log-time[data-ts]').forEach(el=>{const ts=parseFloat(el.dataset.ts); if(!isNaN(ts)){const t=formatTimestamp(ts); el.textContent=t.short; el.title=t.full;}});} backfillSSR();
+  let dotsTimer=null, animating=false, baseLabel='', lastBaseLabel='';
+  function startDots(){ if(animating) return; animating=true; let i=0; dotsTimer=setInterval(()=>{const dots=['.','..','...','..','.',''][i++%6]; if(labelEl) labelEl.textContent=baseLabel+' '+dots;},400);} 
+  function stopDots(){ if(dotsTimer) clearInterval(dotsTimer); dotsTimer=null; animating=false; if(labelEl) labelEl.textContent=baseLabel; }
+  async function fetchProgress(){ const res=await fetch(`/progress?rid=${encodeURIComponent(rid)}`, {cache:'no-store'}); if(!res.ok) throw new Error('progress fetch failed'); return res.json(); }
+  function renderSteps(steps){ if(!Array.isArray(steps)) return; if(summary) summary.innerHTML=steps.map(s=>`<li>${s.label} — ${s.summary||''}</li>`).join(''); if(logEl){ logEl.innerHTML=steps.map(s=>{const t=formatTimestamp(s.ts||0); return `<div class="log-row"><div class="log-time" title="${t.full}">${t.short}</div><div><div class="log-label">${s.label}</div><div class="log-detail">${s.detail||s.summary||''}</div></div></div>`;}).join(''); } }
+  // ETA state
+  const etaEl = document.getElementById('progressEta');
+  let startedAt = Date.now();
+  let emaRate = null; // percent per ms (EMA)
+  let lastPct = 0;
+  const ALPHA = 0.25; // smoothing factor
+  function fmtEta(ms){ if(!isFinite(ms) || ms<=0) return 'ETA —'; const s=Math.round(ms/1000); if(s<5) return 'ETA <5s'; if(s<60) return `ETA ${s}s`; const m=Math.floor(s/60), rs=s%60; if(m<60) return rs?`ETA ${m}m ${rs}s`:`ETA ${m}m`; const h=Math.floor(m/60), rm=m%60; return rm?`ETA ${h}h ${rm}m`:`ETA ${h}h`; }
+  function updateEta(pct){ if(!etaEl) return; if(pct>=100){ etaEl.textContent='Done'; return; } if(pct<=1){ etaEl.textContent='ETA —'; return; } const elapsed = Date.now()-startedAt; const instRate = pct/elapsed; if(instRate>0){ emaRate = emaRate==null?instRate:(ALPHA*instRate + (1-ALPHA)*emaRate); } if(emaRate){ const remainPct = 100-pct; const msRemain = remainPct/emaRate; etaEl.textContent = fmtEta(msRemain); } }
+  let stopped=false; async function poll(){ if(stopped) return; try{ const p=await fetchProgress(); const prog=p.progress||{}; const pct=prog.percent||0; if(bar){ bar.style.width=pct+'%'; bar.setAttribute('aria-valuenow', pct);} if(pctEl) pctEl.textContent=pct+'%'; updateEta(pct); const steps=prog.steps||[]; baseLabel=steps.length?steps[steps.length-1].label:'Working…'; if(baseLabel!==lastBaseLabel){ lastBaseLabel=baseLabel; if(animating) stopDots(); if(labelEl) labelEl.textContent=baseLabel; if(!p.done) startDots(); } if(p.done){ stopDots(); if(labelEl) labelEl.textContent='Finalize results'; updateEta(100); } renderSteps(steps); if(p.done && p.has_result){ stopped=true; window.location.replace(`/result?rid=${encodeURIComponent(rid)}&ts=${Date.now()}`); return; } }catch(e){ console.warn(e);}finally{ if(!stopped) setTimeout(poll,800);} }
+  if(waiting && rid) poll();
+})();
+</script>
+        {% endif %}
+      </section>
+    </form>
   </main>
 
   <script>
-    // Persist Keepa key within the browser (until tab refresh/close)
-    const keyInput = document.getElementById('keepa_key');
-    keyInput.value = localStorage.getItem('keepaKey') || '';
-    keyInput.addEventListener('input', () => {
-      localStorage.setItem('keepaKey', keyInput.value.trim());
+  document.addEventListener('DOMContentLoaded', () => {
+    // Keepa key persistence + hold-to-reveal
+    const keyInput  = document.getElementById('keepa_key');
+    const revealBtn = document.getElementById('reveal_key');
+    if (keyInput && revealBtn) {
+      const savedKey = localStorage.getItem('keepaKey');
+      if (savedKey !== null) keyInput.value = savedKey;
+      const persistKey = () => {
+        const val = keyInput.value.trim();
+        if (val === '') localStorage.removeItem('keepaKey');
+        else localStorage.setItem('keepaKey', val);
+      };
+      keyInput.addEventListener('input', persistKey);
+      keyInput.addEventListener('change', persistKey);
+      const reveal = (on) => keyInput.setAttribute('type', on ? 'text' : 'password');
+      revealBtn.addEventListener('pointerdown', (e) => { reveal(true); e.preventDefault(); });
+      ['pointerup','pointerleave','pointercancel','blur'].forEach(evt => revealBtn.addEventListener(evt, () => reveal(false)));
+      revealBtn.addEventListener('keydown', (e) => { if (e.code === 'Space' || e.code === 'Enter') { reveal(true); e.preventDefault(); }});
+      revealBtn.addEventListener('keyup', () => reveal(false));
+    }
+
+    // OpenAI key persistence + reveal
+      // Persist strip_brand switch state
+      const stripBrandEl = document.getElementById('strip_brand');
+      if(stripBrandEl){
+        const saved = localStorage.getItem('stripBrand');
+        if(saved !== null){ stripBrandEl.checked = saved === '1'; }
+        stripBrandEl.addEventListener('change', () => {
+          localStorage.setItem('stripBrand', stripBrandEl.checked ? '1' : '0');
+        });
+      }
+    const openaiInput  = document.getElementById('openai_key');
+    const revealOpenai = document.getElementById('reveal_openai');
+    if (openaiInput && revealOpenai) {
+      const saved = localStorage.getItem('openaiKey');
+      if (saved !== null) openaiInput.value = saved;
+      const persist = () => {
+        const val = openaiInput.value.trim();
+        if (val === '') localStorage.removeItem('openaiKey');
+        else localStorage.setItem('openaiKey', val);
+      };
+      openaiInput.addEventListener('input', persist);
+      openaiInput.addEventListener('change', persist);
+      const reveal2 = (on) => openaiInput.setAttribute('type', on ? 'text' : 'password');
+      revealOpenai.addEventListener('pointerdown', (e) => { reveal2(true); e.preventDefault(); });
+      ['pointerup','pointerleave','pointercancel','blur'].forEach(evt => revealOpenai.addEventListener(evt, () => reveal2(false)));
+    }
+
+    // Model selector persistence
+    const modelSelect = document.getElementById('openai_model');
+    if (modelSelect) {
+      const savedModel = localStorage.getItem('openaiModel');
+      if (savedModel) modelSelect.value = savedModel;
+      modelSelect.addEventListener('change', () => {
+        localStorage.setItem('openaiModel', modelSelect.value);
+      });
+    }
+
+    // Want-N themed slider + inline number (1-50)
+    const wantNSlider = document.getElementById('want_n_slider');
+    const wantNNumber = document.getElementById('want_n'); // this is the named form field
+    const wantNHint = document.getElementById('want_n_hint');
+    function clampWant(v){ v = parseInt(v,10); if (isNaN(v)) v=25; return Math.min(50, Math.max(1, v)); }
+    const savedWantN = localStorage.getItem('wantN');
+    if (savedWantN !== null && wantNSlider && wantNNumber){
+      let v = clampWant(savedWantN); wantNSlider.value = v; wantNNumber.value = v; if (wantNHint) wantNHint.textContent = v; }
+    function syncWant(fromSlider){
+      if (!wantNSlider || !wantNNumber) return;
+      let v = fromSlider ? wantNSlider.value : wantNNumber.value;
+      v = clampWant(v);
+      wantNSlider.value = v;
+      wantNNumber.value = v;
+      if (wantNHint) wantNHint.textContent = v;
+      localStorage.setItem('wantN', v);
+    }
+
+    // Phase-2 facet sliders (yellow multiplier & min score) persistence
+    const yellowSlider = document.getElementById('yellow_multiplier_slider');
+    const yellowNum = document.getElementById('yellow_multiplier');
+    const minScoreSlider = document.getElementById('min_score_pct_slider');
+    const minScoreNum = document.getElementById('min_score_pct');
+
+    function clampYellow(v){ v = parseFloat(v); if (isNaN(v)) v = 0.5; return Math.min(1, Math.max(0, v)); }
+    function clampMinScore(v){ v = parseInt(v,10); if (isNaN(v)) v = 70; return Math.min(95, Math.max(40, v)); }
+
+    const savedYellow = localStorage.getItem('phase2YellowMult');
+    const savedMinScore = localStorage.getItem('phase2MinScore');
+    if (savedYellow !== null && yellowSlider && yellowNum){
+      const y = clampYellow(savedYellow); yellowSlider.value = y; yellowNum.value = y; }
+    if (savedMinScore !== null && minScoreSlider && minScoreNum){
+      const ms = clampMinScore(savedMinScore); minScoreSlider.value = ms; minScoreNum.value = ms; }
+
+    function syncYellow(fromSlider){
+      if (!yellowSlider || !yellowNum) return;
+      let v = fromSlider ? yellowSlider.value : yellowNum.value; v = clampYellow(v);
+      yellowSlider.value = v; yellowNum.value = v; localStorage.setItem('phase2YellowMult', v);
+    }
+    function syncMinScore(fromSlider){
+      if (!minScoreSlider || !minScoreNum) return;
+      let v = fromSlider ? minScoreSlider.value : minScoreNum.value; v = clampMinScore(v);
+      minScoreSlider.value = v; minScoreNum.value = v; localStorage.setItem('phase2MinScore', v);
+    }
+    if (yellowSlider && yellowNum){
+      yellowSlider.addEventListener('input', () => syncYellow(true));
+      yellowNum.addEventListener('input', () => syncYellow(false));
+      yellowNum.addEventListener('change', () => syncYellow(false));
+      yellowNum.addEventListener('focus', () => yellowNum.select());
+      yellowNum.addEventListener('keydown', e => { if (e.key==='Enter'){ e.preventDefault(); yellowNum.blur(); }});
+      yellowNum.addEventListener('blur', () => syncYellow(false));
+    }
+    if (minScoreSlider && minScoreNum){
+      minScoreSlider.addEventListener('input', () => syncMinScore(true));
+      minScoreNum.addEventListener('input', () => syncMinScore(false));
+      minScoreNum.addEventListener('change', () => syncMinScore(false));
+      minScoreNum.addEventListener('focus', () => minScoreNum.select());
+      minScoreNum.addEventListener('keydown', e => { if (e.key==='Enter'){ e.preventDefault(); minScoreNum.blur(); }});
+      minScoreNum.addEventListener('blur', () => syncMinScore(false));
+    }
+    if (wantNSlider && wantNNumber){
+      wantNSlider.addEventListener('input', () => syncWant(true));
+      wantNNumber.addEventListener('input', () => syncWant(false));
+      wantNNumber.addEventListener('change', () => syncWant(false));
+      wantNNumber.addEventListener('focus', () => wantNNumber.select());
+      wantNNumber.addEventListener('keydown', (e)=>{ if (e.key==='Enter'){ e.preventDefault(); wantNNumber.blur(); }});
+      wantNNumber.addEventListener('blur', () => syncWant(false));
+      // initial sync if not restored
+      if (savedWantN === null) syncWant(false);
+    }
+
+    // --- Dynamic fee controls ---
+    function clamp(val, min, max){ return Math.min(max, Math.max(min, val)); }
+    const ebayFeeSlider = document.getElementById('ebay_fee_pct_slider');
+    const ebayFeeNum    = document.getElementById('ebay_fee_pct');
+    const adFeeSlider   = document.getElementById('ad_fee_pct_slider');
+    const adFeeNum      = document.getElementById('ad_fee_pct');
+
+    // Load persisted values (if any)
+    const savedEbay = localStorage.getItem('ebayFeePct');
+    const savedAd   = localStorage.getItem('adFeePct');
+    if (savedEbay !== null){
+      const v = clamp(parseFloat(savedEbay), 5, 30);
+      ebayFeeSlider.value = v;
+      ebayFeeNum.value = v.toFixed(1);
+    }
+    if (savedAd !== null){
+      const v = clamp(parseFloat(savedAd), 0, 20);
+      adFeeSlider.value = v;
+      adFeeNum.value = v.toFixed(1);
+    }
+
+    function syncEbay(fromSlider){
+      let v = fromSlider ? parseFloat(ebayFeeSlider.value) : parseFloat(ebayFeeNum.value);
+      if (isNaN(v)) v = 15;
+      v = clamp(v, 5, 30);
+      ebayFeeSlider.value = v;
+      ebayFeeNum.value = v.toFixed(1);
+      localStorage.setItem('ebayFeePct', v.toFixed(1));
+    }
+    function syncAd(fromSlider){
+      let v = fromSlider ? parseFloat(adFeeSlider.value) : parseFloat(adFeeNum.value);
+      if (isNaN(v)) v = 4;
+      v = clamp(v, 0, 20);
+      adFeeSlider.value = v;
+      adFeeNum.value = v.toFixed(1);
+      localStorage.setItem('adFeePct', v.toFixed(1));
+    }
+    if (ebayFeeSlider && ebayFeeNum){
+      ebayFeeSlider.addEventListener('input', () => syncEbay(true));
+      ebayFeeNum.addEventListener('input', () => syncEbay(false));
+      ebayFeeNum.addEventListener('change', () => syncEbay(false));
+    }
+    if (adFeeSlider && adFeeNum){
+      adFeeSlider.addEventListener('input', () => syncAd(true));
+      adFeeNum.addEventListener('input', () => syncAd(false));
+      adFeeNum.addEventListener('change', () => syncAd(false));
+    }
+    // Dynamic min margin controls (-10 to 200)
+    const marginSlider = document.getElementById('min_margin_pct_slider');
+    const marginNum    = document.getElementById('min_margin_pct');
+  function clampMargin(v){ return Math.min(200, Math.max(-10, v)); }
+  function snap5(v){ return Math.round(v / 5) * 5; }
+    const savedMargin  = localStorage.getItem('minMarginPct');
+    if (savedMargin !== null && marginSlider && marginNum){
+      let mv = parseFloat(savedMargin); if (isNaN(mv)) mv = 10; mv = clampMargin(mv);
+  mv = snap5(mv);
+  marginSlider.value = mv; marginNum.value = mv.toFixed(0);
+    }
+    function syncMargin(fromSlider){
+      if (!marginSlider || !marginNum) return;
+      let v = fromSlider ? parseFloat(marginSlider.value) : parseFloat(marginNum.value);
+  if (isNaN(v)) v = 10; v = clampMargin(v); v = snap5(v);
+  marginSlider.value = v; marginNum.value = v.toFixed(0);
+  localStorage.setItem('minMarginPct', v.toFixed(0));
+    }
+    if (marginSlider && marginNum){
+      marginSlider.addEventListener('input', () => syncMargin(true));
+      marginNum.addEventListener('input', () => syncMargin(false));
+      marginNum.addEventListener('change', () => syncMargin(false));
+      marginNum.addEventListener('focus', () => marginNum.select());
+      marginNum.addEventListener('keydown', (e)=>{ if (e.key==='Enter'){ e.preventDefault(); marginNum.blur(); }});
+      marginNum.addEventListener('blur', () => syncMargin(false));
+    }
+
+    // --- Dynamic undercut controls (0.00 to 1.00, step 0.05) ---
+    const undercutSlider = document.getElementById('undercut_amount_slider');
+    const undercutNum    = document.getElementById('undercut_amount');
+    function clampUnder(v){ return Math.min(1, Math.max(0, v)); }
+    function snap005(v){ return Math.round(v / 0.05) * 0.05; }
+    const DEFAULT_UNDERCUT = Number("{{ '%.2f'|format(UNDERCUT_AMOUNT) }}");
+    const savedUnder = localStorage.getItem('undercutAmt');
+    if (savedUnder !== null && undercutSlider && undercutNum){
+      let uv = parseFloat(savedUnder); if (isNaN(uv)) uv = DEFAULT_UNDERCUT; uv = clampUnder(uv); uv = snap005(uv);
+      undercutSlider.value = uv.toFixed(2); undercutNum.value = uv.toFixed(2);
+    }
+    function syncUnder(fromSlider){
+      if (!undercutSlider || !undercutNum) return;
+      let v = fromSlider ? parseFloat(undercutSlider.value) : parseFloat(undercutNum.value);
+      if (isNaN(v)) v = DEFAULT_UNDERCUT;
+      v = clampUnder(v); v = snap005(v);
+      undercutSlider.value = v.toFixed(2);
+      undercutNum.value = v.toFixed(2);
+      localStorage.setItem('undercutAmt', v.toFixed(2));
+    }
+    if (undercutSlider && undercutNum){
+      undercutSlider.addEventListener('input', () => syncUnder(true));
+      undercutNum.addEventListener('input', () => syncUnder(false));
+      undercutNum.addEventListener('change', () => syncUnder(false));
+      undercutNum.addEventListener('focus', () => undercutNum.select());
+      undercutNum.addEventListener('keydown', (e)=>{ if (e.key==='Enter'){ e.preventDefault(); undercutNum.blur(); }});
+      undercutNum.addEventListener('blur', () => syncUnder(false));
+    }
+
+    // Inline-number UX: show as plain text until interaction, already styled via CSS.
+    [ebayFeeNum, adFeeNum].forEach(el => {
+      if (!el) return;
+      el.addEventListener('focus', () => { el.select(); });
+      el.addEventListener('blur', () => {
+        // Re-sync and ensure formatting (one decimal)
+        if (el === ebayFeeNum) syncEbay(false); else syncAd(false);
+      });
+      // Enter blurs to commit value quickly
+      el.addEventListener('keydown', (e) => { if (e.key === 'Enter'){ e.preventDefault(); el.blur(); }});
     });
-  </script>
+
+    // ---- Sidebar eBay Product card (URL rebuilt from itemNumber) ----
+    const ebayTextarea = document.getElementById('ebay_data');
+    const ebayCard = document.getElementById('sidebarEbayProduct');
+    const ebayLinkWrap = document.getElementById('sidebarEbayLinkWrap');
+    function buildEbayLink(itemNumber){
+      return `https://www.ebay.com/itm/${encodeURIComponent(itemNumber)}`;
+    }
+    function updateEbayCard(){
+      if (!ebayTextarea || !ebayCard || !ebayLinkWrap){ return; }
+      const raw = ebayTextarea.value.trim();
+      if (!raw){ ebayCard.style.display='none'; ebayLinkWrap.innerHTML=''; return; }
+      let obj = null; try { obj = JSON.parse(raw); } catch { ebayCard.style.display='none'; return; }
+      const itemNumber = obj && obj.itemNumber;
+      const title = (obj && obj.title) ? String(obj.title).trim() : '';
+      if (!itemNumber || !title){ ebayCard.style.display='none'; ebayLinkWrap.innerHTML=''; return; }
+      const url = buildEbayLink(itemNumber);
+      ebayLinkWrap.innerHTML = `<a href="${url}" target="_blank" rel="noopener">${title}</a>`;
+      ebayCard.style.display='grid';
+    }
+    if (ebayTextarea){
+      ebayTextarea.addEventListener('input', updateEbayCard);
+      updateEbayCard();
+    }
+
+    // --- Auto-resize textareas (#ebay_data, #amazon_links) up to CSS max-height ---
+    const taIds = ['ebay_data','amazon_links'];
+    function autoResize(el){
+      if(!el) return;
+      // Reset to auto to correctly measure scrollHeight shrinking
+      el.style.height = 'auto';
+      // Respect the CSS max-height (380px) but allow natural growth until then
+      const maxH = 380; // Keep in sync with CSS (#ebay_data, #amazon_links max-height)
+      const newH = Math.min(el.scrollHeight, maxH);
+      el.style.height = newH + 'px';
+    }
+    taIds.forEach(id => {
+      const ta = document.getElementById(id);
+      if(!ta) return;
+      // Initial sizing (in case content pre-filled from server or browser restore)
+      autoResize(ta);
+      // Recalculate on input
+      ta.addEventListener('input', () => autoResize(ta));
+      // Also adjust after paste events (input usually covers, but just in case of async)
+      ta.addEventListener('paste', () => setTimeout(()=>autoResize(ta),0));
+    });
+  });
+   (function () {
+    const toggle = document.getElementById('progressToggle');
+    const log    = document.getElementById('progressLog');
+    const chev   = document.getElementById('progressChev');
+
+    if (!toggle || !log) return;
+
+    const setOpen = (open) => {
+      log.style.display = open ? 'block' : 'none';
+      toggle.setAttribute('aria-expanded', String(open));
+      if (chev) chev.style.transform = open ? 'rotate(90deg)' : 'rotate(0deg)';
+      toggle.querySelector('span').textContent = open ? 'Hide progress log' : 'Show progress log';
+    };
+
+    // default closed
+    setOpen(false);
+
+    toggle.addEventListener('click', () => {
+      const open = log.style.display !== 'block';
+      setOpen(open);
+    });
+  })();
+  // Multi-toast system
+  function toast(msg, ms=4000){
+    let container = document.getElementById('toast-container');
+    if (!container){
+      container = document.createElement('div');
+      container.id = 'toast-container';
+      container.style.position='fixed';
+      container.style.left='50%';
+      container.style.bottom='22px';
+      container.style.transform='translateX(-50%)';
+      container.style.display='grid';
+      container.style.gap='8px';
+      container.style.zIndex='9999';
+      container.style.maxWidth='92%';
+      document.body.appendChild(container);
+    }
+    const t = document.createElement('div');
+    t.className='toast-msg';
+    t.textContent = msg;
+    t.style.background='#11151b';
+    t.style.border='1px solid #273042';
+    t.style.color='#e7ebf3';
+    t.style.padding='10px 14px';
+    t.style.borderRadius='12px';
+    t.style.font='500 13px/1.4 system-ui,-apple-system,Segoe UI,Roboto,Inter,Arial,sans-serif';
+    t.style.boxShadow='0 8px 24px rgba(0,0,0,.35)';
+    t.style.opacity='0';
+    t.style.transition='opacity .25s ease, transform .25s ease';
+    t.style.transform='translateY(6px)';
+    container.appendChild(t);
+    requestAnimationFrame(()=>{ t.style.opacity='1'; t.style.transform='translateY(0)'; });
+    setTimeout(()=>{
+      t.style.opacity='0'; t.style.transform='translateY(6px)';
+      setTimeout(()=> t.remove(), 260);
+    }, ms);
+  }
+// end utility + progress toggle/persistence script
+</script>
+
+<script>
+// Theme toggle persistence
+(function(){
+  const btn = document.getElementById('themeToggle');
+  if(!btn) return;
+  const body = document.body;
+  const KEY = 'spref_theme_mode'; // values: 'dark' | 'light'
+  function apply(mode){
+    body.classList.toggle('modern-light', mode === 'light');
+  }
+  const stored = localStorage.getItem(KEY);
+  if(stored){ apply(stored); }
+  btn.addEventListener('click', ()=>{
+    const nowLight = !body.classList.contains('modern-light');
+    apply(nowLight ? 'light' : 'dark');
+    localStorage.setItem(KEY, nowLight ? 'light' : 'dark');
+  });
+})();
+</script>
+
+<!-- Removed legacy validation script and duplicate polling script -->
+
+<!-- Helper validation regex (legacy migration marker removed) -->
+<script>
+function isKeepaKey(k){ return /^[A-Za-z0-9]{64}$/.test((k||'').trim()); }
+function isOpenAIKey(k){ return /^sk-[A-Za-z0-9_\-]{20,}$/.test((k||'').trim()); } // supports sk-proj--
+</script>
+
+<script>
+// --- Enhanced client-side sorting (combined & best modes) ---
+document.addEventListener('DOMContentLoaded', () => {
+  function num(v){ if(v===undefined||v===null||v==='') return NaN; const n = parseFloat(v); return isNaN(n)?NaN:n; }
+  function combinedMetric(el){
+    // Prefer profit first; fallback to margin; if both NaN returns NaN
+    const p = num(el.dataset.profit);
+    const m = num(el.dataset.margin);
+    if(!isNaN(p) && !isNaN(m)) return (p * 0.7) + (m * 0.3); // weighted blend
+    if(!isNaN(p)) return p;
+    if(!isNaN(m)) return m;
+    return NaN;
+  }
+  function bestMetric(el){
+    // Prioritize non-negative profit & margin first, then score then profit then margin.
+    const sRaw = num(el.dataset.score);
+    const pRaw = num(el.dataset.profit);
+    const mRaw = num(el.dataset.margin);
+    const s = isNaN(sRaw)? -Infinity : sRaw;
+    const p = isNaN(pRaw)? -Infinity : pRaw;
+    const m = isNaN(mRaw)? -Infinity : mRaw;
+    const profitPositive = p >= 0 ? 1 : 0; // binary flag
+    const marginPositive = m >= 0 ? 1 : 0;
+    return { profitPositive, marginPositive, s, p, m };
+  }
+
+  function sortList(elements, mode){
+    const asc = mode.endsWith('_asc');
+    const factor = asc ? 1 : -1; // multiply (av - bv)
+    const isCombined = mode.startsWith('combined');
+    const isScore = mode.startsWith('score');
+    const isBest = mode === 'best';
+    const isFailed = mode === 'failed_highprofit';
+
+    elements.sort((a,b)=>{
+      if(isFailed){
+        // Treat elements as having dataset.passed ('1' or '0'). Show failed (0) first by profit desc, then passed by best metric.
+        const A = bestMetric(a); const B = bestMetric(b);
+        const aPass = (a.dataset.passed === '1');
+        const bPass = (b.dataset.passed === '1');
+        if(aPass !== bPass) return aPass ? 1 : -1; // failed first
+        if(!aPass && !bPass){ // both failed -> profit desc then margin desc then score desc
+          const ap = num(a.dataset.profit); const bp = num(b.dataset.profit);
+          if(ap !== bp) return (bp - ap);
+          const am = num(a.dataset.margin); const bm = num(b.dataset.margin);
+          if(am !== bm) return (bm - am);
+          const as = num(a.dataset.score); const bs = num(b.dataset.score);
+          if(as !== bs) return (bs - as);
+          return 0;
+        }
+        // both passed -> reuse best logic below but keep profit/margin positivity boost
+        if(A.profitPositive !== B.profitPositive) return B.profitPositive - A.profitPositive;
+        if(A.marginPositive !== B.marginPositive) return B.marginPositive - A.marginPositive;
+        if(A.s !== B.s) return B.s - A.s;
+        if(A.p !== B.p) return B.p - A.p;
+        if(A.m !== B.m) return B.m - A.m;
+        return 0;
+      }
+      if(isBest){
+        const A = bestMetric(a); const B = bestMetric(b);
+        if(A.profitPositive !== B.profitPositive) return B.profitPositive - A.profitPositive; // prefer positive profit
+        if(A.marginPositive !== B.marginPositive) return B.marginPositive - A.marginPositive; // then positive margin
+        if(A.s !== B.s) return B.s - A.s; // higher score
+        if(A.p !== B.p) return B.p - A.p; // higher profit
+        if(A.m !== B.m) return B.m - A.m; // higher margin
+        return 0;
+      }
+      let av, bv;
+      if(isCombined){ av = combinedMetric(a); bv = combinedMetric(b); }
+      else if(isScore){ av = num(a.dataset.score); bv = num(b.dataset.score); }
+      else { // fallback shouldn't hit (we removed plain profit/margin modes)
+        av = combinedMetric(a); bv = combinedMetric(b);
+      }
+      const aNa = isNaN(av), bNa = isNaN(bv);
+      if(aNa && bNa) return 0;
+      if(aNa) return 1; // push NaNs to end
+      if(bNa) return -1;
+      if(av === bv) return 0;
+      return (av - bv) * factor;
+    });
+  }
+
+  // Results
+  const resultsSelect = document.getElementById('resultsSort');
+  const resultsGrid   = document.getElementById('resultsGrid');
+  function applyResultsSort(){
+    if(!resultsSelect || !resultsGrid) return;
+    const mode = resultsSelect.value;
+    const cards = Array.from(resultsGrid.querySelectorAll('.prod'));
+    sortList(cards, mode);
+    cards.forEach(c => resultsGrid.appendChild(c));
+  }
+  if(resultsSelect){ resultsSelect.addEventListener('change', applyResultsSort); applyResultsSort(); }
+
+  // Phase-2
+  const phase2Select = document.getElementById('phase2Sort');
+  function applyPhase2Sort(){
+    if(!phase2Select) return;
+    const tbody = document.querySelector('#comparisonGrid table.facet-reflow tbody');
+    if(!tbody) return;
+    const mode = phase2Select.value;
+    // gather groups
+    const topRows = Array.from(tbody.querySelectorAll('tr.facet-top-row'));
+    const groups = topRows.map(top => ({
+      top,
+      bottom: top.nextElementSibling && top.nextElementSibling.classList.contains('facet-bottom-row') ? top.nextElementSibling : null,
+      keyEl: top.querySelector('td[data-score]') || top.querySelector('td')
+    }));
+    // Build virtual elements carrying dataset for sorting
+    const virtual = groups.map(g => {
+      const el = g.keyEl || g.top;
+      return { el: g, dataset: {
+        score: (el && el.dataset.score) || '',
+        profit: (el && el.dataset.profit) || '',
+        margin: (el && el.dataset.margin) || ''
+      }};
+    });
+    sortList(virtual.map(v => ({ dataset: v.dataset, _g: v.el })), phase2Select.value);
+    // Rebuild order
+    virtual.sort((a,b)=>0); // neutralize original array; we rely on mapped sorted list
+    const sortedGroups = virtual.map(v => v._g);
+    // Actually we produced sorted groups through separate transformation; redo properly:
+    const sorted = [];
+    // Re-run a clean pass using element groups sorted via sortList on a parallel array
+    const pairArray = groups.map(g => ({ dataset: {
+      score: (g.keyEl && g.keyEl.dataset.score) || '',
+      profit: (g.keyEl && g.keyEl.dataset.profit) || '',
+      margin: (g.keyEl && g.keyEl.dataset.margin) || '',
+      passed: (g.keyEl && g.keyEl.dataset.passed) || '0'
+    }, g }));
+    sortList(pairArray, phase2Select.value);
+    pairArray.forEach(p => { tbody.appendChild(p.g.top); if(p.g.bottom) tbody.appendChild(p.g.bottom); });
+  }
+  if(phase2Select){
+    phase2Select.addEventListener('change', applyPhase2Sort);
+    const details = document.getElementById('comparisonGrid');
+    if(details){
+      if(details.open) applyPhase2Sort();
+      else details.addEventListener('toggle', () => { if(details.open) applyPhase2Sort(); }, { once:true });
+    }
+  }
+});
+</script>
+
+
+<!-- Enhanced conditional submit validation (migration marker removed) -->
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  const form    = document.querySelector('form.app');
+  const keepa   = document.getElementById('keepa_key');
+  const openai  = document.getElementById('openai_key');
+  const ebayTa  = document.getElementById('ebay_data');
+  const linksTa = document.getElementById('amazon_links');
+  const resetBtn = document.getElementById('reset_btn');
+  const progressCard = document.getElementById('progressCard');
+
+  if (!form) return;
+
+  function markInvalid(el, yes=true){ if (el) el.classList.toggle('is-invalid', !!yes); }
+
+  form.addEventListener('submit', (e) => {
+    [keepa, openai, ebayTa, linksTa].forEach(el => markInvalid(el, false));
+    const errors = [];
+
+    const keepaVal = keepa.value.trim();
+    const openaiVal = openai.value.trim();
+    const ebayRaw = ebayTa.value.trim();
+    const linksRaw = linksTa.value.split('\n').map(x=>x.trim()).filter(Boolean);
+    const linksEmpty = linksRaw.length === 0;
+
+    // Keepa presence
+    if (!keepaVal){
+      errors.push({el: keepa, msg:'Please enter your Keepa API key.'});
+    } else if (!isKeepaKey(keepaVal)) {
+      errors.push({el: keepa, msg:'Invalid Keepa API key. Expected 64 alphanumeric characters.'});
+    }
+
+    // eBay JSON presence + structure
+    if (!ebayRaw){
+      errors.push({el: ebayTa, msg:'Please paste eBay data (JSON) before running.'});
+    } else {
+      let okJSON = true;
+      try {
+        const obj = JSON.parse(ebayRaw);
+        if (!obj.title || typeof obj.price !== 'number') okJSON = false;
+      } catch { okJSON = false; }
+      if (!okJSON){
+        errors.push({el: ebayTa, msg:'Invalid eBay JSON. Example: {"title":"…","price":12.34,"itemNumber":"…"}'});
+      }
+    }
+
+    // OpenAI requirement only when no manual links
+    if (linksEmpty){
+      if (!openaiVal){
+        errors.push({el: openai, msg:'OpenAI key required to use Product Finder (leave links empty only if you have a valid key).'});
+      } else if (!isOpenAIKey(openaiVal)) {
+        errors.push({el: openai, msg:'Invalid OpenAI API key format. It should start with "sk-".'});
+      }
+    }
+
+    if (errors.length){
+      e.preventDefault();
+      // Mark all invalid
+      errors.forEach(er => markInvalid(er.el, true));
+      // Emit all toasts (cap at 5 to avoid overload)
+      errors.slice(0,5).forEach(er => toast(er.msg));
+      // Focus first invalid field
+      errors[0].el.focus();
+    }
+  });
+
+  // Unified reset: clear UI, localStorage, backend caches for current rid
+  if (resetBtn){
+    resetBtn.addEventListener('click', async (e) => {
+      e.preventDefault();
+      // Clear form fields
+      form.reset();
+      // Clear localStorage keys
+      ['keepaKey','openaiKey','openaiModel','wantN'].forEach(k => localStorage.removeItem(k));
+      // Attempt backend reset (ignore failures)
+      try {
+        const rid = progressCard ? progressCard.dataset.rid : null;
+        const url = rid ? `/reset?rid=${encodeURIComponent(rid)}` : '/reset';
+        await fetch(url, { method:'POST' });
+      } catch(_) {}
+      // Redirect to fresh homepage
+      window.location.href = '/';
+    });
+  }
+});
+</script>
+
+<!-- ... your remaining scripts and HTML stay the same -->
+
+
+
 </body>
+<script>
+// --- Generalized persistence for all numeric + range slider pairs ---
+(function(){
+  const defs = [
+    {num:'want_n',            range:'want_n_slider',            key:'spref_want_n',            lo:1,   hi:50},
+    {num:'ebay_fee_pct',      range:'ebay_fee_pct_slider',      key:'spref_ebay_fee_pct',      lo:5,   hi:30},
+    {num:'ad_fee_pct',        range:'ad_fee_pct_slider',        key:'spref_ad_fee_pct',        lo:0,   hi:20},
+    {num:'undercut_amount',   range:'undercut_amount_slider',   key:'spref_undercut_amount',   lo:0,   hi:1},
+    {num:'min_margin_pct',    range:'min_margin_pct_slider',    key:'spref_min_margin_pct',    lo:-10, hi:200},
+    {num:'yellow_multiplier', range:'yellow_multiplier_slider', key:'spref_yellow_multiplier', lo:0,   hi:1},
+    {num:'min_score_pct',     range:'min_score_pct_slider',     key:'spref_min_score_pct',     lo:40,  hi:95},
+  ];
+
+  function clamp(v, lo, hi){ v = parseFloat(v); if(isNaN(v)) return null; return Math.min(hi, Math.max(lo, v)); }
+  function setVal(el, v){ if(el) el.value = v; }
+  function sync(a, b){ if(a && b) b.value = a.value; }
+
+  defs.forEach(d => {
+    const numEl = document.getElementById(d.num);
+    const rngEl = document.getElementById(d.range);
+    if(!numEl && !rngEl) return;
+    // Load stored value
+    const stored = localStorage.getItem(d.key);
+    const cv = clamp(stored, d.lo, d.hi);
+    if(cv !== null){
+      if(numEl) setVal(numEl, cv);
+      if(rngEl) setVal(rngEl, cv);
+    }
+    const persist = () => {
+      const src = numEl || rngEl; if(!src) return;
+      const val = clamp(src.value, d.lo, d.hi);
+      if(val !== null){
+        if(numEl) setVal(numEl, val);
+        if(rngEl) setVal(rngEl, val);
+        localStorage.setItem(d.key, val);
+      }
+    };
+    if(numEl) numEl.addEventListener('input', e => { sync(numEl, rngEl); persist(); });
+    if(rngEl) rngEl.addEventListener('input', e => { sync(rngEl, numEl); persist(); });
+  });
+})();
+</script>
 </html>

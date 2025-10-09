@@ -1,5 +1,31 @@
-fastapi==0.115.2
-uvicorn==0.30.6
-httpx==0.27.2
-python-dotenv==1.0.1
-jinja2==3.1.4python-multipart==0.0.20
+# Web framework
+fastapi==0.104.1
+uvicorn==0.24.0
+
+# HTTP client
+httpx==0.25.2
+
+# Data / validation
+pydantic==2.5.0
+
+# Environment variables
+python-dotenv==1.0.0
+
+# OpenAI SDK (official, for GPT calls)
+openai>=1.0.0
+
+# Caching utilities
+cachetools==5.3.2
+
+# JSON performance
+orjson==3.9.10
+
+# Resilience
+tenacity==8.2.3
+
+# Testing
+pytest==7.4.3
+pytest-asyncio==0.21.1
+
+# FastAPI form parsing
+python-multipart==0.0.9

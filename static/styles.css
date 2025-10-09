@@ -17,3 +17,11 @@ button:hover { filter: brightness(1.05); }
 .grid { display:grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap:16px; }
 .grid .full { grid-column: 1 / -1; }
 .mono { white-space: pre-wrap; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace; font-size: 12px; background:#0d131b; padding:12px; border-radius:12px; border:1px solid var(--border); }
+.input-with-reveal { position: relative; display: flex; align-items: center; }
+.input-with-reveal input { flex: 1; padding-right: 40px; } /* space for the eye */
+.reveal-btn {
+  position: absolute; right: 6px; top: 50%; transform: translateY(-50%);
+  background: transparent; border: 0; cursor: pointer; padding: 6px;
+  color: #b8c4d9; font-size: 16px; line-height: 1;
+}
+.reveal-btn:active { transform: translateY(-50%) scale(0.98); }
